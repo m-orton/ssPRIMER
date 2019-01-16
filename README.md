@@ -24,6 +24,7 @@ Ensure the sample alignment is in your working directory:
 
 For the primer design to work, the following files must also be in your working directory:
 [Hybrid-min](RequiredFiles/hybrid-min.exe)
+
 [Hybrid-ss-min](RequiredFiles/hybrid-ss-min.exe)
 
 *For download of primer sets using the tool, please ensure the shiny app is running in a web browser window and not 
@@ -35,4 +36,5 @@ Contributions by Dr. Sally Adamowicz and Kamil Chatila-Amos
 
 This tool relies greatly on the DECIPHER and Biostrings R packages for design of primer sets:
 [DECIPHER Package](https://bioconductor.org/packages/release/bioc/html/DECIPHER.html)
+
 [Biostrings Package](http://bioconductor.org/packages/release/bioc/html/Biostrings.html)
