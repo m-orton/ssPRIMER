@@ -3,10 +3,12 @@ options(shiny.maxRequestSize = 30*1024^2)
 
 # source("https://bioconductor.org/biocLite.R")
 # biocLite("DECIPHER")
+# biocLite("Biostrings")
 library(Biostrings)
 library(DECIPHER)
-# install.packages(c('ggplot2', 'shiny'))
+# install.packages("ggplot2")
 library(ggplot2)
+# install.packages("shiny")
 library(shiny)
 # install.packages("shinyjs")
 library(shinyjs)
@@ -17,68 +19,81 @@ library(jsonlite)
 # install.packages("plyr")
 library(plyr)
 
-exampleAlignment <- readDNAStringSet("alignmentTrimLimnephilus.fas")
+exampleAlignment <- readDNAStringSet("sampleAlignment.fas")
 
 ui <- tagList(useShinyjs(),
-              tags$head(
-                tags$style(
-                  HTML(".shiny-notification {
-                       height: 100px;
-                       width: 800px;
-                       position:fixed;
-                       top: calc(50% - 50px);;
-                       left: calc(50% - 400px);;
-                       }
+        tags$head(
+           tags$style(
+             HTML(".shiny-notification {
+                  height: 100px;
+                  width: 800px;
+                  position:fixed;
+                  top: calc(50% - 50px);;
+                  left: calc(50% - 400px);;
+                   }
                        "
-                  )
-                  )
-                  ),
+              )
+              )
+              ),
               navbarPage("ssPRIMER - A Web-Based Tool for Species-Specific Primer Design", id = "mainPage",
-                         tabPanel("1. Upload Alignment", id='panel1', value="panel1",
-                                  sidebarLayout(
-                                    sidebarPanel(
-                                      p("Welcome to the ssPRIMER homepage! ssPRIMER is a GUI based tool that provides a straightforward process to designing species-specific primers for Taqman probe based qPCR Assays.
-                                        To start please upload a mulitple sequence alignment in fasta format. More options will then be presented to begin the design process.
-                                        You can also run a test alignment to test out the functionality of the tool. Once uploaded, an interactive visual representation of 
-                                        the alignment will be shown to the right using integration primarily with the Decipher R and Bioconductor packages. 
-                                        Design of probes along with primer sets is currently being tested and will be added soon."),
-                                      tags$hr(),
-                                      div(id="alignmentLoad",
+                 tabPanel("1. Upload Alignment", id='panel1', value="panel1",
+                      sidebarLayout(
+                          sidebarPanel(
+                             p("Welcome to the ssPRIMER homepage! ssPRIMER is a GUI based tool that provides a straightforward 
+                               process to designing species-specific primers for Taqman probe based qPCR Assays.
+                               To start please upload a mulitple sequence alignment in fasta format. 
+                               More options will then be presented to begin the design process.
+                               You can also run a test alignment to test out the functionality of the tool. 
+                               Once uploaded, an interactive visual representation of the alignment will be shown to the 
+                               right using integration primarily with the Decipher R and Bioconductor packages. 
+                               Design of probes along with primer sets is currently being tested and will be added soon."),
+                            
+                               tags$hr(),
+                            
+                                  div(id="alignmentLoad",
                                           
-                                          actionButton('exampleAlign', "Load Test Alignment", icon("info-circle"), 
-                                                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                     actionButton('exampleAlign', "Load Test Alignment", icon("info-circle"), 
+                                                   style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                           
-                                          tags$hr(),
+                                     tags$hr(),
                                           
-                                          p("Please ensure that the sequences for the target species are named in exactly the same format.
-                                            Ex: Limnephilus_hyalinus and Limnephilus hyalinus would not be considered the same target group."),
+                                     p("Please ensure that the sequences for the target species are named in exactly the same format.
+                                       Ex: Limnephilus_hyalinus and Limnephilus hyalinus would not be considered the same target group."),
                                           
-                                          fileInput('alignmentFile', 'Choose an alignment to upload (.fas or .fa format), max file size = 30 Mb',
-                                                    multiple = F,
-                                                    accept = c(
-                                                      '.fa',
-                                                      '.fas'
-                                                    )
-                                          )),
+                                        fileInput('alignmentFile', 'Choose an alignment to upload (.fas or .fa format), 
+                                                   max file size = 30 Mb. Enusre all sequences are the same length before 
+                                                   uploading, this may require an alignment trimming step before upload.',
+                                                   multiple = F,
+                                                   accept = c(
+                                                     '.fa',
+                                                     '.fas'
+                                                  )
+                                       )),
                                       
                                       tags$hr(),
+                            
                                       conditionalPanel(
                                         
                                         condition = "output.fileUploaded",
                                         
                                         div(id="target",
-                                            p("First select a target group from your alignment that you would like to be selectively amplified."),
+                                            p("First select a target group from your alignment that you would like to be 
+                                               selectively amplified."),
+                                        
                                             selectInput("inSelectTarget", "Target Species",
                                                         choices = "Pending Upload"),
                                             
                                             tags$hr(),
                                             
-                                            p("You can also restrict to a specific region of the alignment you would like targeted by your primer set. It
-                                              is recommeded you do not select a region smaller than 75 bp as this will greatly limit the number of potential 
-                                              primer sets. The alignment visualization will regenerate with the region specified automatically."),
+                                            p("You can also restrict to a specific region of the alignment you would like targeted 
+                                               by your primer set. It is recommeded you do not select a region smaller than 75 bp 
+                                               as this will greatly limit the number of potential primer sets. The alignment 
+                                               visualization will regenerate with the region specified automatically."),
+                        
                                             sliderInput("inSlider1", "Restrict Amplification Region",
                                                         min = 1, max = 100, value = c(1,100))
                                             ),
+                        
                                         a(id = "toggleAlignSettings", "View more alignment settings", href = "#"),
                                         shinyjs::hidden(   
                                           div(id="alignSettings",    
@@ -107,11 +122,13 @@ ui <- tagList(useShinyjs(),
                          tabPanel("2. Set qPCR Reaction Conditions", id='panel2', value="panel2",
                                   sidebarLayout(
                                     sidebarPanel(
+                                      
                                       # Chose Reaction Conditions for qPCR
                                       div(id="qPCRConditions",
                                           p("You can either choose a pre-defined option from the dropdown menu or adjust manually. 
-                                            IDT qPCR parameters will load by default for easy ordering of primers from IDT. More reaction 
-                                            presets will be added in the future."),
+                                            IDT qPCR parameters will load by default for easy ordering of primers from IDT. 
+                                            More reaction presets will be added in the future."),
+                                    
                                           selectInput("inSelect2", "Choose a Master Mix for qPCR",
                                                       choices = c("Default IDT qPCR Conditions","Chai Master Mix (Hot Start 2x)")),
                                           
@@ -144,100 +161,107 @@ ui <- tagList(useShinyjs(),
                                               width=7))),
                          
                          tabPanel("3. Set Primer Constraints", id='panel3', value="panel3",
-                                  sidebarLayout(
-                                    sidebarPanel(
+                             sidebarLayout(
+                                   sidebarPanel(
                                       
-                                      div(id="Primers",   
+                                    div(id="Primers",   
                                           
-                                          tabsetPanel(id="panels",     
+                                       tabsetPanel(id="panels",     
                                                       
-                                                      tabPanel("Primary Constraints", id='panel3a', value="panel3a",
+                                          tabPanel("Primary Constraints", id='panel3a', value="panel3a",
                                                                
-                                                               tags$hr(),      
+                                             tags$hr(),      
                                                                
-                                                               p("Next, set the contraints on your primers before designing them. 
-                                                                 It is highly recommended you start with the default if you are new to primer design.
-                                                                 Default ranges and values are based on the IDT primer design guidelines for Taqman based qPCR as well
-                                                                 as suggested default values from the Decipher package. More experienced users can navigate to the secondary 
-                                                                 contraints tab, the contraints shown below are the most critical to the design process."),
+                                             p("Next, set the contraints on your primers before designing them. 
+                                                It is highly recommended you start with the default if you are new to 
+                                                primer design. Default ranges and values are based on the IDT primer 
+                                                design guidelines for Taqman based qPCR as well as suggested default 
+                                                values from the Decipher package. More experienced users can navigate 
+                                                to the secondary contraints tab, the contraints shown below are the 
+                                                most critical to the design process."),
                                                                
                                                                
-                                                               # Amplicon Length
-                                                               uiOutput("slider9"),
+                                              # Amplicon Length
+                                              uiOutput("slider9"),
                                                                
-                                                               # Minimum Coverage 
-                                                               #h5("Minimum fraction of the target species sequences that must be covered with the primer+probe set."),
-                                                               sliderInput("inSlider12", "Min Target Coverage (minimum fraction of target sequences from the alignment that must be covered with the primers and probe)",
-                                                                           min = 20, max = 100, value = 80, post = "%"),
+                                              # Minimum Coverage 
+                                              # h5("Minimum fraction of the target species sequences that must be covered with the 
+                                              #     primer+probe set."),
+                                              sliderInput("inSlider12", "Min Target Coverage (minimum fraction of target 
+                                                           sequences from the alignment that must be covered with the 
+                                                            primers and probe)",
+                                                          min = 20, max = 100, value = 80, post = "%"),
                                                                
-                                                               # Minimum Amplification Efficiency
-                                                               #h5("Minimum efficiency of hybridization desired for the primer set."),
-                                                               sliderInput("inSlider13", "Min Target Hybridization Efficiency (minimum fraction of target amplicons that will be amplified with the specified primer set each PCR cycle)",
-                                                                           min = 50, max = 100, value = 80, post = "%"),
+                                              # Minimum Amplification Efficiency
+                                              #h5("Minimum efficiency of hybridization desired for the primer set."),
+                                              sliderInput("inSlider13", "Min Target Hybridization Efficiency (minimum fraction 
+                                                          of target amplicons that will be amplified with the specified primer 
+                                                          set each PCR cycle)",
+                                                          min = 50, max = 100, value = 80, post = "%"),
                                                                
-                                                               sliderInput("inSlider14", "Max Non-Target Hybridization Efficiency (maximum fraction of non-target amplicons that will be amplified with the specified primer set each PCR cycle)",
-                                                                           min = 0, max = 20, value = 10, post = "%"),
+                                              sliderInput("inSlider14", "Max Non-Target Hybridization Efficiency 
+                                                         (maximum fraction of non-target amplicons that will be amplified 
+                                                          with the specified primer set each PCR cycle)",
+                                                          min = 0, max = 20, value = 10, post = "%"),
                                                                
-                                                               # Primer set Tm
-                                                               #h5("Target annealing temperature for the primer set."),
-                                                               sliderInput("inSlider15", "Optimal Primer Set Tm",
-                                                                           min = 50, max = 70, value = 60, step = 0.1, post = "C"),
+                                              # Primer set Tm
+                                              #h5("Target annealing temperature for the primer set."),
+                                              sliderInput("inSlider15", "Optimal Primer Set Tm",
+                                                          min = 50, max = 70, value = 60, step = 0.1, post = "C"),
                                                                
-                                                               sliderInput("inSlider16", "Primer Length Range",
-                                                                           min = 18, max = 40, value = c(18, 23), post = "bp"),
+                                              sliderInput("inSlider16", "Primer Length Range",
+                                                          min = 18, max = 40, value = c(18, 23), post = "bp"),
                                                                
-                                                               sliderInput("inSlider18", "Number of Potential Primer Sets to Generate",
-                                                                           min = 1, max = 15, value = 5, step = 1),
+                                              sliderInput("inSlider18", "Number of Potential Primer Sets to Generate",
+                                                          min = 1, max = 15, value = 5, step = 1),
                                                                
-                                                               actionButton('back2', "Back", icon("angle-double-left"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                              actionButton('back2', "Back", icon("angle-double-left"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                                
-                                                               actionButton('reset2a', "Reset to Default", icon("undo"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                              actionButton('reset2a', "Reset to Default", icon("undo"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                                
-                                                               actionButton('advSettings', "Go to Secondary Constraints", icon("cogs"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                              actionButton('advSettings', "Go to Secondary Constraints", icon("cogs"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                                
-                                                               actionButton('run3a', "Design Primer Sets!", icon("angle-double-right"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
-                                                               ),
+                                              actionButton('run3a', "Design Primer Sets!", icon("angle-double-right"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                              ),
                                                       
-                                                      tabPanel("Secondary Constraints", id='panel3b', value="panel3b",
+                                              tabPanel("Secondary Constraints", id='panel3b', value="panel3b",
 
-                                                               tags$hr(),
+                                              tags$hr(),
                                                                
-                                                               p("***These settings are still being tested and are not currently functional***"),
+                                              p("***These settings are still being tested and are not currently functional***"),
                                                                
-                                                               sliderInput("inSlider17", "Primer GC Ratio Range",
-                                                                           min = 35, max = 75, value = c(40, 60), step = 0.1, post = "%"), 
+                                              sliderInput("inSlider17", "Primer GC Ratio Range",
+                                                          min = 35, max = 75, value = c(40, 60), step = 0.1, post = "%"), 
                                                                
-                                                               sliderInput("inSlider19", "GC Clamp Length",
-                                                                           min = 0, max = 5, value = c(1, 3), step = 1, post = "bp"),
+                                              sliderInput("inSlider19", "GC Clamp Length",
+                                                          min = 0, max = 5, value = c(1, 3), step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider20", "Max Run Length",
-                                                                           min = 0, max = 10, value = c(0, 4), step = 1, post = "bp"),
+                                              sliderInput("inSlider20", "Max Run Length",
+                                                          min = 0, max = 10, value = c(0, 4), step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider21", "Max Repeat Length",
-                                                                           min = 0, max = 10, value = c(0, 3), step = 1, post = "bp"),
+                                              sliderInput("inSlider21", "Max Repeat Length",
+                                                          min = 0, max = 10, value = c(0, 3), step = 1, post = "bp"),
 
-                                                               sliderInput("inSlider22", "Secondary Structure (Delta G)",
-                                                                           min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
+                                              sliderInput("inSlider22", "Secondary Structure (Delta G)",
+                                                          min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
                                                                
-                                                               sliderInput("inSlider23", "Self-Dimerization (Delta G)",
-                                                                           min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
+                                              sliderInput("inSlider23", "Self-Dimerization (Delta G)",
+                                                          min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
                                                                
-                                                               sliderInput("inSlider24", "Cross-Dimerization (Delta G)",
-                                                                           min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
+                                              sliderInput("inSlider24", "Cross-Dimerization (Delta G)",
+                                                          min = -10, max = 0, value = c(-9, 0), step = 1, post = " kcal/mol"),
                                                                
-                                                               actionButton('back3', "Back", icon("angle-double-left"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                              actionButton('back3', "Back", icon("angle-double-left"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                                
-                                                               actionButton('reset2b', "Reset to Default", icon("undo"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                              actionButton('reset2b', "Reset to Default", icon("undo"), 
+                                                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
 
-                                                      )
-                                                      
-                                                      )), width = 5),
+                                              ))), width = 5),
                                     mainPanel(div(),
                                               width=7))),
                          
@@ -254,18 +278,19 @@ ui <- tagList(useShinyjs(),
                                     
                                     mainPanel(
                                       tabsetPanel(type = "tabs",
-                                                  tabPanel("Primer Sets", div(rHandsontableOutput('primerTable')))
-                                                  # tabPanel("Primer Binding Visualizations",  id='panelPrimerBind', value="panelPrimerBind",
+                                         tabPanel("Primer Sets", div(rHandsontableOutput('primerTable')))
+                                         # ***Tab section in progress***         
+                                         # tabPanel("Primer Binding Visualizations",  id='panelPrimerBind', value="panelPrimerBind",
                                                            
-                                                           # tags$hr(),      
+                                         # tags$hr(),      
                                                            
-                                                           # p("Select one of the primer sets from the dropdown menu and a primer binding visualization will be generated based on your target species. The visualization will indicate 
-                                                           #  the presence of diagnostic bases present in the primer set that can be used to distinguish it from non-target species."),
+                                         # p("Select one of the primer sets from the dropdown menu and a primer binding visualization will be generated based on your target species. The visualization will indicate 
+                                         #   the presence of diagnostic bases present in the primer set that can be used to distinguish it from non-target species."),
                                                            
-                                                           # div(id="primerSelect", 
-                                                           #    selectInput("inSelectPrimer", "Primer Set:",
-                                                           #    choices = "Pending Upload"))
-                                                            #   )
+                                         # div(id="primerSelect", 
+                                         # selectInput("inSelectPrimer", "Primer Set:",
+                                         # choices = "Pending Upload"))
+                                         # )
                                                            
                                       )))),
                          tabPanel("About", id='About', value="panel6",
@@ -273,17 +298,23 @@ ui <- tagList(useShinyjs(),
                                     sidebarPanel(
                                       # Chose Reaction Conditions for qPCR
                                       div(id="about1",
-                                          p("ssPRIMER (or species-specific PRIMER) is a web-based software tool that can be used to design species-specific primer sets for qPCR assays. 
-                                            A multiple sequence alignment can be imported in by a user, and the tool will then guide the user through the process of designing and evaluating species-specific primer sets (and in futue iterations of the tool: Taqman probes).
-                                            The tool is designed to create primer sets that maximize amplification efficiency for the target species (sensitivity) 
-                                            but minimize amplification efficiency for non-target species (specificity). This tool is designed to benefit the users of eDNA technology, 
-                                            including field biologists, ecologists, conservation researchers, and environmental consultants and could contribute to environmental biomonitoring using molecular methods."),
+                                          p("ssPRIMER (or species-specific PRIMER) is a web-based software tool that can be used to 
+                                             design species-specific primer sets for qPCR assays. A multiple sequence alignment can 
+                                             be imported in by a user, and the tool will then guide the user through the process of 
+                                             designing and evaluating species-specific primer sets (and in futue iterations of the tool: 
+                                             Taqman probes). The tool is designed to create primer sets that maximize amplification 
+                                             efficiency for the target species (sensitivity) but minimize amplification efficiency 
+                                             for non-target species (specificity). This tool is designed to benefit the users of eDNA 
+                                             technology, including field biologists, ecologists, conservation researchers, and 
+                                             environmental consultants and could contribute to environmental biomonitoring using 
+                                             molecular methods."),
                                           
                                           tags$hr(),
                                           
-                                          p("This tool relies greatly on the DECIPHER and Biostrings R packages for design of primer sets:
-                                            https://bioconductor.org/packages/release/bioc/html/DECIPHER.html
-                                            http://bioconductor.org/packages/release/bioc/html/Biostrings.html"),
+                                          p("This tool relies greatly on the DECIPHER and Biostrings R packages for design of 
+                                             primer sets:
+                                             https://bioconductor.org/packages/release/bioc/html/DECIPHER.html
+                                             http://bioconductor.org/packages/release/bioc/html/Biostrings.html"),
                                           
                                           tags$hr(),
                                           
@@ -322,6 +353,7 @@ server <- function(input, output, session){
     reactUpload$upload <- exampleAlignment
   })
   
+  # Reactive variable for alignment upload
   contentsrea <- reactive({
     reactUpload$upload2 <- input$alignmentFile
     if (is.null(reactUpload$upload2) && is.null(reactUpload$upload)){
@@ -336,10 +368,12 @@ server <- function(input, output, session){
     splitNames <- unlist(lapply(strsplit((names(reactUpload$alignment)), "[*]", fixed=TRUE), function(x) return(x[1])))
   })
   
+  # Reactive varibale for alignment length
   contentsrea2 <- reactive({
     dnaLength <- as.numeric(nchar(reactUpload$alignment[[1]]))
   })
   
+  # qPCR Reaction Pre-sets selectable in the UI                     
   observeEvent(input$inSelect2, {
     if(input$inSelect2 == 'Chai Master Mix (Hot Start 2x)'){
       updateSliderInput(session, "inSlider2", value = 6)
@@ -366,6 +400,7 @@ server <- function(input, output, session){
     reactSlider1$sliderInput3 <- input$inSlider1[2]
   })
   
+  # Variable for display of alignment - width adjustment
   observeEvent(input$inSliderWidth, {
     reactSlider1$sliderInput4 <- input$inSliderWidth
   })
@@ -406,9 +441,11 @@ server <- function(input, output, session){
   reactTarget <- reactiveValues(
     target=NULL)
   
+  # Calculation of amplicon length range slider based on target range amplification region
   output$slider9 <- renderUI({
     if(reactSlider1$sliderInput1 < 75){
-      sliderInput("inSlider9", "Amplicon Length Range", min = (reactSlider1$sliderInput1-10), max = reactSlider1$sliderInput1, value = c((reactSlider1$sliderInput1-5), reactSlider1$sliderInput1), post="bp")
+      sliderInput("inSlider9", "Amplicon Length Range", min = (reactSlider1$sliderInput1-10), 
+                  max = reactSlider1$sliderInput1, value = c((reactSlider1$sliderInput1-5), reactSlider1$sliderInput1), post="bp")
     } else {
       sliderInput("inSlider9", "Amplicon Length Range", min = 75, max = reactSlider1$sliderInput1, value = c(75, 150), post="bp")
     }
@@ -421,9 +458,9 @@ server <- function(input, output, session){
   
   # Primer design Variables
   primerVar <- reactiveValues(startPos=NULL, endPos=NULL, minLength=NULL, maxLength=NULL, primer=NULL,
-                              probe=NULL, mono=NULL, div=NULL, dNTP=NULL, annealTempProbe=NULL, minProductSize=NULL, maxProductSIze=NULL,
-                              annealTempPrimer=NULL, minEfficiency=NULL, numPrimerSets=NULL, minCoverage=NULL, 
-                              numPrimerSets=NULL, primerPosStart=NULL, primerPosEnd=NULL, gc=NULL)
+                              probe=NULL, mono=NULL, div=NULL, dNTP=NULL, annealTempProbe=NULL, minProductSize=NULL, 
+                              maxProductSIze=NULL, annealTempPrimer=NULL, minEfficiency=NULL, numPrimerSets=NULL, 
+                              minCoverage=NULL, numPrimerSets=NULL, primerPosStart=NULL, primerPosEnd=NULL, gc=NULL)
   
   # Observe primer design choices
   observeEvent(input$inSlider1[1], {
@@ -506,7 +543,7 @@ server <- function(input, output, session){
     updateTabsetPanel(session, "panels", selected = 'panel3a')
   })
   
-  # Generating primer sets
+  # Generating primer sets using the Decipher package
   observeEvent(input$run3a, {
     
     withProgress(message = "Starting Design Process...this may take a few mins...", value = 0, {
@@ -568,6 +605,7 @@ server <- function(input, output, session){
     
   })
   
+  # ***ANother section still in progress for primer binding visualization                         
   # observe({
   #   updateSelectInput(session, "inSelectPrimer", choices = as.character(primerVar$setID))
   # })
@@ -576,6 +614,7 @@ server <- function(input, output, session){
   #  alignment <- subseq(reactUpload$alignment, primerVar$primerPosStart, primerVar$primerPosEnd)
   # })
   
+  # Shiny Download handler for download of generated primer sets
   output$downloadPrimers <- downloadHandler(
     filename = function() { 
       paste("Primers", Sys.Date(), ".csv", sep="")
@@ -585,7 +624,7 @@ server <- function(input, output, session){
     })
   
   
-  # Reset to defaults
+  # Reset to defaults for each Tab
   observeEvent(input$reset1, {
     shinyjs::reset("qPCRConditions")
   })
