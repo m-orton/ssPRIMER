@@ -35,7 +35,7 @@ ui <- tagList(useShinyjs(),
               )
               )
               ),
-              navbarPage("ssPRIMER - A Web-Based Tool for Species-Specific Primer Design", id = "mainPage",
+              navbarPage("ssPRIMER - A GUI-Based Tool for Species-Specific Primer Design", id = "mainPage",
                  tabPanel("1. Upload Alignment", id='panel1', value="panel1",
                       sidebarLayout(
                           sidebarPanel(
