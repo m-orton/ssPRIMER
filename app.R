@@ -269,8 +269,7 @@ ui <- tagList(useShinyjs(),
                                   sidebarLayout(
                                     sidebarPanel(
                                       
-                                      p("Download primer and probe sets
-                                        in .csv"), 
+                                      p("Download primer sets in .csv"), 
                                       
                                       div(id="PrimerTableDownload",
                                           downloadButton('downloadPrimers', 'Download')
