@@ -21,13 +21,13 @@ install.packages("plyr")
 
 Ensure the sample alignment is in your working directory:
 
-[Sample Alignment](RequiredFiles/sampleAlignment.fas)
+[Sample Alignment](sampleAlignment.fas)
 
 For the primer design to work, the following files must also be in your working directory:
 
-[Hybrid-min](RequiredFiles/hybrid-min.exe)
+[Hybrid-min](hybrid-min.exe)
 
-[Hybrid-ss-min](RequiredFiles/hybrid-ss-min.exe)
+[Hybrid-ss-min](hybrid-ss-min.exe)
 
 *For download of primer sets using the tool, please ensure the shiny app is running in a web browser window and not 
 the RStuduio viewer. The download handler will not work in the RStudio viewer.*
