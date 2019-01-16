@@ -12,6 +12,7 @@ source("https://bioconductor.org/biocLite.R")
 biocLite("Biostrings")
 biocLite("DECIPHER")
 install.packages("RSQLite")
+install.packages("shiny")
 install.packages("ggplot2")
 install.packages("shinyjs")
 install.packages("rhandsontable")
@@ -19,18 +20,20 @@ install.packages("jsonlite")
 install.packages("plyr")
 ```
 
-Ensure the sample alignment is in your working directory:
+To run simply use the command:
+'''
+shiny::runGitHub('ssPRIMER', 'm-orton')
+'''
+
+Alternatively you can run by ensuring the app.R script and following files are in your current working
+R directory in RStudio:
 
 [Sample Alignment](sampleAlignment.fas)
-
-For the primer design to work, the following files must also be in your working directory:
 
 [Hybrid-min](hybrid-min.exe)
 
 [Hybrid-ss-min](hybrid-ss-min.exe)
 
-*For download of primer sets using the tool, please ensure the shiny app is running in a web browser window and not 
-the RStuduio viewer. The download handler will not work in the RStudio viewer.*
 
 ## Authors of Shiny App
 Matthew Orton
