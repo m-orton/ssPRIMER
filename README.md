@@ -21,9 +21,9 @@ install.packages("plyr")
 ```
 
 To run simply use the command:
-'''
+```
 shiny::runGitHub('ssPRIMER', 'm-orton')
-'''
+```
 
 Alternatively you can run by ensuring the app.R script and following files are in your current working
 R directory in RStudio:
