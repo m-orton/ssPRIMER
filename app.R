@@ -1,11 +1,10 @@
 # Change max file upload is 30 Mb
 options(shiny.maxRequestSize = 30*1024^2)
 
-# source("https://bioconductor.org/biocLite.R")
-# biocLite("DECIPHER")
-# biocLite("Biostrings")
-library(Biostrings)
-library(DECIPHER)
+# Please ensure R version: 3.6.0 is installed prior to running this tool
+
+# install.packages("plyr")
+library(plyr)
 # install.packages("ggplot2")
 library(ggplot2)
 # install.packages("shiny")
@@ -16,8 +15,16 @@ library(shinyjs)
 library(rhandsontable)
 # install.packages("jsonlite")
 library(jsonlite)
-# install.packages("plyr")
-library(plyr)
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+# BiocManager::install("Biostrings")
+# BiocManager::install("DECIPHER")
+library(Biostrings)
+library(DECIPHER)
+
+# install.packages("RSQLite")
+library(RSQLite)
 
 exampleAlignment <- readDNAStringSet("sampleAlignment.fas")
 
@@ -365,7 +372,7 @@ server <- function(input, output, session){
     if (is.null(reactUpload$upload2)){
       reactUpload$alignment <- reactUpload$upload
     }
-    splitNames <- unlist(lapply(strsplit((names(reactUpload$alignment)), "[*]", fixed=TRUE), function(x) return(x[1])))
+    splitNames <- as.character(unlist(lapply(strsplit((names(reactUpload$alignment)), "[*]", fixed=TRUE), function(x) return(x[1]))))
   })
   
   # Reactive varibale for alignment length
@@ -557,7 +564,7 @@ server <- function(input, output, session){
       desc <- dbGetQuery(dbConn, "select description from Seqs")
       desc <- unlist(lapply(strsplit(desc$description, "userAlignment", fixed=TRUE),
                             function(x) return(x[length(x)])))
-      #desc <- unlist(lapply(strsplit(desc, " ", fixed=TRUE), function(x) return(x[1])))
+      # desc <- unlist(lapply(strsplit(desc, " ", fixed=TRUE), function(x) return(x[2])))
       Add2DB(data.frame(identifier=desc), dbConn)
       
       tiles <- TileSeqs(dbConn)
