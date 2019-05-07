@@ -6,17 +6,30 @@ ssPRIMER (or species-specific PRIMER) is a shiny based software tool that can be
 Please ensure the following packages are installed in R/RStudio:
 
 ```
-source("https://bioconductor.org/biocLite.R")
-source("https://bioconductor.org/biocLite.R")
-biocLite("Biostrings")
-biocLite("DECIPHER")
-install.packages("RSQLite")
-install.packages("shiny")
-install.packages("ggplot2")
-install.packages("shinyjs")
-install.packages("rhandsontable")
-install.packages("jsonlite")
-install.packages("plyr")
+# Please ensure R version: 3.6.0 is installed prior to running this tool
+
+# install.packages("plyr")
+library(plyr)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.packages("shiny")
+library(shiny)
+# install.packages("shinyjs")
+library(shinyjs)
+# install.packages("rhandsontable")
+library(rhandsontable)
+# install.packages("jsonlite")
+library(jsonlite)
+
+# install.packages("RSQLite")
+library(RSQLite)
+
+# if (!requireNamespace("BiocManager", quietly = TRUE))
+#  install.packages("BiocManager")
+# BiocManager::install("Biostrings")
+# BiocManager::install("DECIPHER")
+library(Biostrings)
+library(DECIPHER)
 ```
 
 To run simply use the command in RStudio:
