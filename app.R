@@ -55,7 +55,7 @@ ui <- tagList(useShinyalert(),
                                   sidebarLayout(
                                     sidebarPanel(
                                       p("Welcome to the ssPRIMER homepage! ssPRIMER is a GUI based tool that provides a straightforward 
-                                        process to designing species-specific primers for Taqman probe based qPCR Assays.
+                                        process to designing species-specific primers and Taqman probe for qPCR Assays.
                                         To start please upload a mulitple sequence alignment in fasta format. 
                                         More options will then be presented to begin the design process.
                                         You can also run a test alignment to test out the functionality of the tool. 
@@ -233,7 +233,7 @@ ui <- tagList(useShinyalert(),
                                                           sliderInput("inSlider14", "Max Non-Target Hybridization Efficiency 
                                                                       (maximum fraction of non-target amplicons that will be amplified 
                                                                        with the specified primer set each PCR cycle)",
-                                                                       min = 0, max = 20, value = 10, post = "%"),
+                                                                       min = 0, max = 30, value = 10, post = "%"),
                                                                
                                                           # Primer set Tm
                                                           #h5("Target annealing temperature for the primer set."),
@@ -241,7 +241,7 @@ ui <- tagList(useShinyalert(),
                                                                       min = 40, max = 70, value = 60, step = 0.1, post = "C"),
                                                                
                                                           sliderInput("inSlider29", "Max Primer Set Tm Difference (ideally should be within 0-3 degrees difference)",
-                                                                      min = 0, max = 5, value = 3, step = 0.1, post = "C"),
+                                                                      min = 0, max = 6, value = 3, step = 0.1, post = "C"),
                                                                
                                                           sliderInput("inSlider26", "Min Increase in Probe Annealing Temperature (ideally should be 7-10 degrees higher than primers)",
                                                                       min = 1, max = 20, value = 7, step = 0.1, post = "C"),
@@ -267,7 +267,7 @@ ui <- tagList(useShinyalert(),
                                                                            min = 18, max = 30, value = c(18, 23), step = 1, post = "bp"),
                                                                
                                                                sliderInput("inSlider30", "Probe Length Range",
-                                                                           min = 18, max = 40, value = c(25, 28), step = 1, post = "bp"),
+                                                                           min = 20, max = 40, value = c(25, 28), step = 1, post = "bp"),
                                                                
                                                                sliderInput("inSlider27", "Primer GC Percentage Range",
                                                                            min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
@@ -281,11 +281,11 @@ ui <- tagList(useShinyalert(),
                                                                
                                                                p("***These settings are still being tested and are not currently functional***"),
                                                                
-                                                               sliderInput("inSlider20", "Max Run Length (ex: AAA would be a run length of 3)",
+                                                               sliderInput("inSlider20", "Max Run Length for Primers and Probes (ex: AAA would be a run length of 3)",
                                                                            min = 0, max = 10, value = 4, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider21", "Max Repeat Length (ex: CGCG would be a repeat length of 2)",
-                                                                           min = 0, max = 10, value = 3, step = 1, post = "bp"),
+                                                               sliderInput("inSlider21", "Max Repeat Length for Primers and Probes (ex: CGCG would be a repeat length of 2)",
+                                                                           min = 0, max = 5, value = 2, step = 1, post = "bp"),
                                                                
                                                                actionButton('back3', "Back", icon("angle-double-left"), 
                                                                             style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
@@ -394,7 +394,7 @@ ui <- tagList(useShinyalert(),
                                           tags$hr(),
                                                                                     
                                           p("This tool relies greatly on the DECIPHER, Biostrings and TmCalculator R packages and OligoArrayAux 
-                                            software for design of primer sets:"),
+                                             software for design of primer sets:"),
                                           a(href="https://bioconductor.org/packages/release/bioc/html/DECIPHER.html", "DECIPHER, ", target="_blank"),
                                           a(href="http://bioconductor.org/packages/release/bioc/html/Biostrings.html", "Biostrings, ", target="_blank"),
                                           a(href="https://cran.r-project.org/web/packages/TmCalculator/index.html", "TmCalculator, ", target="_blank"),
@@ -469,7 +469,7 @@ server <- function(input, output, session){
     splitNames <- as.character(unlist(lapply(strsplit((names(reactUpload$alignment)), "[*]", fixed=TRUE), function(x) return(x[1]))))
   })
   
-  # Reactive varibale for alignment length
+  # Reactive variable for alignment length
   contentsrea2 <- reactive({
     dnaLength <- as.numeric(nchar(reactUpload$alignment[[1]]))
   })
@@ -524,7 +524,11 @@ server <- function(input, output, session){
     return(includeHTML( file (contentsrea3() )))
   }
   output$inc<-renderUI({
-    try(getPage(), silent = TRUE)
+    if (is.null(reactUpload$alignment)){
+      return(NULL)
+    } else {
+      getPage()
+    }
   })
   
   # Only show a portion of the UI before upload and then reveal after alignment uplaod
@@ -743,7 +747,43 @@ server <- function(input, output, session){
         primers$setID <- row.names(primers)
         primers$length_FP <- nchar(primers$forward_primer)
         primers$length_RP <- nchar(primers$reverse_primer)
-        primers$ampliconLength <- primers$start_reverse - primers$start_forward + 1
+        
+        # Subsetting alignment by target amplification region and using that alignment for calculation of primers
+        dna <- SearchDB(dbConn)
+        alignment <- subseq(dna, reactSlider1$sliderInput2, reactSlider1$sliderInput3)
+        names(alignment) <- desc
+        u_alignment <- unique(alignment)
+        names(u_alignment) <- names(alignment)[match(u_alignment, alignment)]
+        alignment <- u_alignment
+        # move the target group to the top
+        w <- which(names(alignment)==reactTarget$target)
+        alignment <- c(alignment[w], alignment[-w])
+        targetSequence <- alignment[1]
+        
+        # Forwar primer positioning
+        forwardPrimers <- foreach(i=1:nrow(primers)) %do% DNAString(primers$forward_primer[i])
+        matchPatternFP <- foreach(i=1:length(forwardPrimers)) %do% vmatchPattern(forwardPrimers[[i]], targetSequence, max.mismatch=2)
+        matchPatternFP_End <- foreach(i=1:length(forwardPrimers)) %do% matchPatternFP[[i]]@ends
+        matchPatternFP_End <- as.numeric(unlist(matchPatternFP_End))
+        matchPatternFP_Start <- foreach(i=1:length(forwardPrimers)) %do% matchPatternFP[[i]]@width0
+        matchPatternFP_Start <- matchPatternFP_End - as.numeric(unlist(matchPatternFP_Start)) + 1
+        primers$startPosFP <- matchPatternFP_Start
+        primers$endPosFP <- matchPatternFP_End
+        
+        # Reverse primer positioning
+        reversePrimers <- foreach(i=1:nrow(primers)) %do% DNAString(primers$reverse_primer[i])
+        reversePrimers <- foreach(i=1:length(reversePrimers)) %do% reverseComplement(reversePrimers[[i]])
+        matchPatternRP <- foreach(i=1:length(reversePrimers)) %do% vmatchPattern(reversePrimers[[i]], targetSequence, max.mismatch=2)
+        matchPatternRP_End <- foreach(i=1:length(reversePrimers)) %do% matchPatternRP[[i]]@ends
+        matchPatternRP_End <- as.numeric(unlist(matchPatternRP_End))
+        matchPatternRP_Start <- foreach(i=1:length(reversePrimers)) %do% matchPatternRP[[i]]@width0
+        matchPatternRP_Start <- matchPatternRP_End - as.numeric(unlist(matchPatternRP_Start)) + 1
+        primers$startPosRP <- matchPatternRP_Start
+        primers$endPosRP <- matchPatternRP_End
+        
+        # Amplicon length calculation
+        primers$ampliconLength <- primers$endPosRP - primers$startPosFP + 1
+        
         primers$FP_hybr_efficiency <- round(primers$forward_efficiency, 2)
         primers$RP_hybr_efficiency <- round(primers$reverse_efficiency, 2)
         
@@ -759,7 +799,7 @@ server <- function(input, output, session){
         if(length(gcCheck) == 0){ 
            shinyalert("Oh no!","Sorry no primer sets met your specified constraints. Please check the following constraint: 
                       % gc content for primers. You will have to increase the % gc content range of your primers.", type = "error")
-          updateNavbarPage(session, "mainPage", selected = 'panel3b')
+           updateNavbarPage(session, "mainPage", selected = 'panel3b')
         } else {
           # Assigning GC content to primers dataframe
           primers <- primers[gcCheck, ]
@@ -792,9 +832,9 @@ server <- function(input, output, session){
                          of non-target species/OTUs.", type = "error")
              updateNavbarPage(session, "mainPage", selected = 'panel3')
           } else {
-            primers <- (primers[,c("setID", "identifier", "ampliconLength", "start_forward", "length_FP","start_reverse","length_RP",
-                                   "forward_primer", "reverse_primer", "FP_hybr_efficiency", "RP_hybr_efficiency", "gcFP", "gcRP", "forward_coverage",
-                                   "reverse_coverage")])
+            primers <- (primers[,c("setID", "identifier", "ampliconLength", "startPosFP", "endPosFP", "length_FP","start_reverse", 
+                                   "startPosRP", "endPosRP", "length_RP", "forward_primer", "reverse_primer", "FP_hybr_efficiency", 
+                                   "RP_hybr_efficiency", "gcFP", "gcRP", "forward_coverage", "reverse_coverage")])
             
             primers <- data.frame(primers, stringsAsFactors = FALSE)
             primers <- as.data.frame(lapply(primers, function(y) gsub(",", "", y)))
@@ -834,8 +874,9 @@ server <- function(input, output, session){
               primerHybrAverage <- (as.numeric(primers$FP_hybr_efficiency) + as.numeric(primers$RP_hybr_efficiency)) / 2
               primers$hybrEfficiencyAverage <- primerHybrAverage
               
-              probeStart <- as.numeric(primers$start_forward) + as.numeric(primers$length_FP) + 1
-              probeEnd <- as.numeric(primers$start_reverse) - as.numeric(primers$length_RP) - 1
+              # Calculating probe start and stop positions that must be met
+              probeStart <- as.numeric(primers$startPosFP) + as.numeric(primers$length_FP) + 1
+              probeEnd <- as.numeric(primers$endPosRP) - as.numeric(primers$length_RP) - 1
               
               incProgress(0.4, detail = "Starting design of probes...")
               
@@ -916,46 +957,16 @@ server <- function(input, output, session){
                       probes <- probes[1:nrow(primers),]
                       probes$setID <- 1:nrow(primers)
                       
+                      # Merging primer sets to probes and modifying/organizing probe columns
                       primerprobes <- merge(primers, probes, by.x="setID", by.y="setID")
                       primerprobes$setID <- 1:nrow(primerprobes)
                       primerprobes$annealDiffProbe <- round(primerprobes$annealProbe - primerprobes$annealAverage, 2)
-                      
-                      # Calculating positions of primers and probe
-                      dna <- SearchDB(dbConn)
-                      alignment <- subseq(dna, reactSlider1$sliderInput2, reactSlider1$sliderInput3)
-                      names(alignment) <- desc
-                      u_alignment <- unique(alignment)
-                      names(u_alignment) <- names(alignment)[match(u_alignment, alignment)]
-                      alignment <- u_alignment
-                      # move the target group to the top
-                      w <- which(names(alignment)==reactTarget$target)
-                      alignment <- c(alignment[w], alignment[-w])
-                      targetSequence <- alignment[1]
-                      
-                      # Forwar primer positioning
-                      forwardPrimers <- foreach(i=1:nrow(primerprobes)) %do% DNAString(primerprobes$forward_primer[i])
-                      matchPatternFP <- foreach(i=1:length(forwardPrimers)) %do% vmatchPattern(forwardPrimers[[i]], targetSequence, max.mismatch=2)
-                      matchPatternFP_End <- foreach(i=1:length(forwardPrimers)) %do% matchPatternFP[[i]]@ends
-                      matchPatternFP_End <- as.numeric(unlist(matchPatternFP_End))
-                      matchPatternFP_Start <- foreach(i=1:length(forwardPrimers)) %do% matchPatternFP[[i]]@width0
-                      matchPatternFP_Start <- matchPatternFP_End - as.numeric(unlist(matchPatternFP_Start)) + 1
-                      primerprobes$startPosFP <- matchPatternFP_Start
-                      primerprobes$endPosFP <- matchPatternFP_End
-                      
-                      # Reverse primer positioning
-                      reversePrimers <- foreach(i=1:nrow(primerprobes)) %do% DNAString(primerprobes$reverse_primer[i])
-                      reversePrimers <- foreach(i=1:length(reversePrimers)) %do% reverseComplement(reversePrimers[[i]])
-                      matchPatternRP <- foreach(i=1:length(reversePrimers)) %do% vmatchPattern(reversePrimers[[i]], targetSequence, max.mismatch=2)
-                      matchPatternRP_End <- foreach(i=1:length(reversePrimers)) %do% matchPatternRP[[i]]@ends
-                      matchPatternRP_End <- as.numeric(unlist(matchPatternRP_End))
-                      matchPatternRP_Start <- foreach(i=1:length(reversePrimers)) %do% matchPatternRP[[i]]@width0
-                      matchPatternRP_Start <- matchPatternRP_End - as.numeric(unlist(matchPatternRP_Start)) + 1
-                      primerprobes$startPosRP <- matchPatternRP_Start
-                      primerprobes$endPosRP <- matchPatternRP_End
-                      
+                      primerprobes$startPosFP <- as.numeric(primerprobes$startPosFP)
+                      primerprobes$endPosFP <- as.numeric(primerprobes$endPosFP)
                       primerprobes$startPosProbe <- as.numeric(primerprobes$start_aligned)
                       primerprobes$endPosProbe <- as.numeric(primerprobes$end_aligned)
-                      
+                      primerprobes$startPosRP <- as.numeric(primerprobes$startPosRP)
+                      primerprobes$endPosRP <- as.numeric(primerprobes$endPosRP)
                       primerprobes$coverage <- as.numeric(primerprobes$coverage)
                       primerprobes$groupCoverage <- as.numeric(primerprobes$groupCoverage)
                       primerprobes$targetCoverage <- round((primerprobes$coverage + primerprobes$groupCoverage) / 2, 4)
@@ -996,7 +1007,6 @@ server <- function(input, output, session){
                       output$primerTable <- renderRHandsontable({
                         rhandsontable(dfPrimers$primerTab) %>% hot_cols(columnSorting = TRUE, readOnly = FALSE, manualColumnResize = TRUE)
                       })
-                      
                     }
                   }
                 }
