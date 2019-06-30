@@ -32,7 +32,10 @@ library(RSQLite)
 library(foreach)
 # install.packages("TmCalculator")
 library(TmCalculator)
+# install.packages("stringi")
+library(stringi)
 
+# Read in of an example alignment for testing
 exampleAlignment <- readDNAStringSet("sampleAlignment.fas")
 
 ui <- tagList(useShinyalert(),
@@ -55,7 +58,7 @@ ui <- tagList(useShinyalert(),
                                   sidebarLayout(
                                     sidebarPanel(
                                       p("Welcome to the ssPRIMER homepage! ssPRIMER is a GUI based tool that provides a straightforward 
-                                        process to designing species-specific primers and Taqman probe for qPCR Assays.
+                                        process to designing species-specific primers and Taqman probes for qPCR Assays.
                                         To start please upload a mulitple sequence alignment in fasta format. 
                                         More options will then be presented to begin the design process.
                                         You can also run a test alignment to test out the functionality of the tool. 
@@ -232,18 +235,22 @@ ui <- tagList(useShinyalert(),
                                                                
                                                           sliderInput("inSlider14", "Max Non-Target Hybridization Efficiency 
                                                                       (maximum fraction of non-target amplicons that will be amplified 
-                                                                       with the specified primer set each PCR cycle)",
-                                                                       min = 0, max = 30, value = 10, post = "%"),
+                                                                       with the specified primer set each PCR cycle. Ideally this should 
+                                                                       be set as low as possible however setting it lower will limit the 
+                                                                       number of possible primer options)",
+                                                                       min = 0, max = 50, value = 10, post = "%"),
                                                                
                                                           # Primer set Tm
                                                           #h5("Target annealing temperature for the primer set."),
                                                           sliderInput("inSlider15", "Optimal Primer Set Annealing Temperature",
                                                                       min = 40, max = 70, value = 60, step = 0.1, post = "C"),
                                                                
-                                                          sliderInput("inSlider29", "Max Primer Set Tm Difference (ideally should be within 0-3 degrees difference)",
+                                                          sliderInput("inSlider29", "Max Primer Set Tm Difference 
+                                                                      (ideally should be within 0-3 degrees difference)",
                                                                       min = 0, max = 6, value = 3, step = 0.1, post = "C"),
                                                                
-                                                          sliderInput("inSlider26", "Min Increase in Probe Annealing Temperature (ideally should be 7-10 degrees higher than primers)",
+                                                          sliderInput("inSlider26", "Min Increase in Probe Annealing Temperature 
+                                                                      (ideally should be 7-10 degrees higher than primers)",
                                                                       min = 1, max = 20, value = 7, step = 0.1, post = "C"),
 
                                                           actionButton('back2', "Back", icon("angle-double-left"), 
@@ -275,17 +282,28 @@ ui <- tagList(useShinyalert(),
                                                                sliderInput("inSlider28", "Probe GC Percentage Range",
                                                                            min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
                                                                
-                                                               sliderTextInput("inSlider23", "Primer-Dimer Hybridization Efficiency (less likely to form dimers < 1e-07 > more likely to form dimers)",
+                                                               sliderTextInput("inSlider23", "Primer-Dimer Hybridization Efficiency 
+                                                                               (less likely to form dimers < 1e-07 > more likely to form dimers. 
+                                                                               Ideally you want this set as low as possible however setting it 
+                                                                               lower will also limit the number of potential primer sets.)",
                                                                                choices = c("1e-09", "1e-08", "1e-07", "1e-06", "1e-05"), 
                                                                                selected = c("1e-07")),
                                                                
-                                                               p("***These settings are still being tested and are not currently functional***"),
+                                                               sliderInput("inSlider20", "Max Run Length for Primers 
+                                                                           (ex: AAA would be a run length of 3)",
+                                                                           min = 0, max = 10, value = 5, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider20", "Max Run Length for Primers and Probes (ex: AAA would be a run length of 3)",
-                                                                           min = 0, max = 10, value = 4, step = 1, post = "bp"),
+                                                               sliderInput("inSlider21", "Max Repeat Length for Primers
+                                                                           (ex: CGCG would be a repeat length of 2)",
+                                                                           min = 0, max = 5, value = 4, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider21", "Max Repeat Length for Primers and Probes (ex: CGCG would be a repeat length of 2)",
-                                                                           min = 0, max = 5, value = 2, step = 1, post = "bp"),
+                                                               sliderInput("inSlider22", "Max Run Length for Probes 
+                                                                           (ex: AAA would be a run length of 3)",
+                                                                           min = 0, max = 10, value = 5, step = 1, post = "bp"),
+                                                               
+                                                               sliderInput("inSlider24", "Max Repeat Length for Probes
+                                                                           (ex: CGCG would be a repeat length of 2)",
+                                                                           min = 0, max = 6, value = 4, step = 1, post = "bp"),
                                                                
                                                                actionButton('back3', "Back", icon("angle-double-left"), 
                                                                             style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
@@ -569,7 +587,8 @@ server <- function(input, output, session){
                               gcPrimerMax=NULL, gcProbeMin=NULL, gcProbeMax=NULL, annealDiffPrimerMin=NULL, annealDiffPrimerMax=NULL,
                               probeMinLength=NULL, probeMaxLength=NULL, annealTempProbe=NULL, monovalentNa=NULL, monovalentK=NULL,
                               divalentMg=NULL, primerConc=NULL, dNTP=NULL, dimers=NULL, maxNonTarget=NULL, setID=NULL, startPosFP=NULL,
-                              endPosFP=NULL, startPosProbe=NULL, endPosProbe=NULL, startPosRP=NULL, endPosRP=NULL, chosenSetId=NULL)
+                              endPosFP=NULL, startPosProbe=NULL, endPosProbe=NULL, startPosRP=NULL, endPosRP=NULL, chosenSetId=NULL, 
+                              repeatL=NULL, runL=NULL, repeatLP=NULL, runLP=NULL)
   
   # Observe primer design choices selected by user
   observeEvent(input$inSlider1[1], {
@@ -632,8 +651,24 @@ server <- function(input, output, session){
     primerVar$maxLength <- as.numeric(input$inSlider16[2])
   })
   
+  observeEvent(input$inSlider20, {
+    primerVar$runL <- as.numeric(input$inSlider20) + 1
+  })
+  
+  observeEvent(input$inSlider21, {
+    primerVar$repeatL <- as.numeric(input$inSlider21) + 1
+  })
+  
+  observeEvent(input$inSlider22, {
+    primerVar$runLP <- as.numeric(input$inSlider22) + 1
+  })
+  
   observeEvent(input$inSlider23, {
     primerVar$dimers <- as.numeric(input$inSlider23)
+  })
+  
+  observeEvent(input$inSlider24, {
+    primerVar$repeatLP <- as.numeric(input$inSlider24) + 1
   })
   
   observeEvent(input$inSlider26, {
@@ -732,7 +767,7 @@ server <- function(input, output, session){
                                    minGroupCoverage=primerVar$minGCoverage, annealingTemp=primerVar$annealTempPrimer, 
                                    P=(primerVar$primerConc/1000000000), monovalent=((primerVar$monovalentNa+primerVar$monovalentK)/1000), 
                                    divalent=(primerVar$divalentMg/1000), dNTPs=(primerVar$dNTP/1000), minEfficiency=primerVar$minEfficiency, 
-                                   numPrimerSets=30, minProductSize=primerVar$minProductSize, maxProductSize=primerVar$maxProductSize, 
+                                   numPrimerSets=50, minProductSize=primerVar$minProductSize, maxProductSize=primerVar$maxProductSize, 
                                    primerDimer=primerVar$dimers), silent = TRUE)
       
       if(dim(primers)[1] == 0){ 
@@ -781,232 +816,294 @@ server <- function(input, output, session){
         primers$startPosRP <- matchPatternRP_Start
         primers$endPosRP <- matchPatternRP_End
         
-        # Amplicon length calculation
-        primers$ampliconLength <- primers$endPosRP - primers$startPosFP + 1
+        # Run detection in primer sets (ex: AAA is a run length of 3 in a primer)
+        regexRun <- paste("(A{",primerVar$runL,"}|G{", primerVar$runL, "}|C{", primerVar$runL, "}|T{", primerVar$runL, "})", sep="")
+        runCheckFP <- foreach(i=1:nrow(primers)) %do% stri_count_regex(primers$forward_primer[i], regexRun, opts_regex = list())
+        runCheckFP_2 <- which(runCheckFP == 0)
+        runCheckRP <- foreach(i=1:nrow(primers)) %do% stri_count_regex(primers$reverse_primer[i], regexRun, opts_regex = list())
+        runCheckRP_2 <- which(runCheckRP == 0)
+        runCheck <- intersect(runCheckFP_2, runCheckRP_2)
+        primers <- primers[runCheck,]
         
-        primers$FP_hybr_efficiency <- round(primers$forward_efficiency, 2)
-        primers$RP_hybr_efficiency <- round(primers$reverse_efficiency, 2)
-        
-        # Calculating GC content
-        gcFP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$forward_primer[i]), "GC", as.prob=TRUE) 
-        gcRP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$reverse_primer[i]), "GC", as.prob=TRUE)
-            
-        # Filtering by GC Content Criteria set by the user
-        gcCheckFP <- which(gcFP > primerVar$gcPrimerMin & gcFP < primerVar$gcPrimerMax)
-        gcCheckRP <- which(gcRP > primerVar$gcPrimerMin & gcRP < primerVar$gcPrimerMax)
-        gcCheck <- intersect(gcCheckFP, gcCheckRP)
-        
-        if(length(gcCheck) == 0){ 
-           shinyalert("Oh no!","Sorry no primer sets met your specified constraints. Please check the following constraint: 
-                      % gc content for primers. You will have to increase the % gc content range of your primers.", type = "error")
-           updateNavbarPage(session, "mainPage", selected = 'panel3b')
+        if(dim(primers)[1] == 0){ 
+          # Error for initial design of the primer sets
+          shinyalert("Oh no!", "It seems you have set your max run length setting set too low for your primers 
+                      and thus no primers could be found. You will have to increase this value.", type = "error")
+          updateNavbarPage(session, "mainPage", selected = 'panel3b')
         } else {
-          # Assigning GC content to primers dataframe
-          primers <- primers[gcCheck, ]
-          gcFP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$forward_primer[i]), "GC", as.prob=TRUE)
-          gcFP <- unlist(gcFP)
-          gcRP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$reverse_primer[i]), "GC", as.prob=TRUE)
-          gcRP <- unlist(gcRP)
-          primers$gcFP <- round(gcFP, 2)
-          primers$gcRP <- round(gcRP, 2)
-
-          # Finding non-target hybridization values and filtering according to non-target hybridization criteria set by the user
-          nonTFP <- regmatches(primers$mismatches_forward, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", primers$mismatches_forward))
-          nonTFP <- foreach(i=1:nrow(primers)) %do% as.numeric(nonTFP[[i]])
-          nonTRP <- regmatches(primers$mismatches_reverse, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", primers$mismatches_reverse))
-          nonTRP <- foreach(i=1:nrow(primers)) %do% as.numeric(nonTRP[[i]])
-          nonTargetCheck <- foreach(i=1:nrow(primers)) %do% append(nonTFP[[i]], nonTRP[[i]])
-          nonTargetCheck2 <- foreach(i=1:nrow(primers)) %do% which(nonTargetCheck[[i]] > 50)
-          nonTargetCheck <- foreach(i=1:nrow(primers)) %do% nonTargetCheck[[i]][-nonTargetCheck2[[i]]]
-          nonTargetCheck <- foreach(i=1:nrow(primers)) %do% max(nonTargetCheck[[i]])
-          primers$nonTarget <- as.numeric(nonTargetCheck)
-          nonTargetCheck <- which(primers$nonTarget > primerVar$maxNonTarget)
-          
-          if(length(nonTargetCheck) > 0){
-             primers <- primers[-nonTargetCheck,]
-          }
+        
+          # Repeat detection in primer sets (ex: CGCG would be a repeat length of 2 in a primer)
+          regexRepeat <- paste("(AA{",primerVar$repeatL, "}|AT{", primerVar$repeatL, "}|AG{", primerVar$repeatL, "}|AC{", primerVar$repeatL,
+                              "}|CA{",primerVar$repeatL, "}|CT{", primerVar$repeatL, "}|CG{", primerVar$repeatL, "}|CC{", primerVar$repeatL, 
+                              "}|GA{",primerVar$repeatL, "}|GT{", primerVar$repeatL, "}|GG{", primerVar$repeatL, "}|GC{", primerVar$repeatL, 
+                              "}|TA{",primerVar$repeatL, "}|TT{", primerVar$repeatL, "}|TG{", primerVar$repeatL, "}|TC{", primerVar$repeatL, "})", sep="")
+          repeatCheckFP <- foreach(i=1:nrow(primers)) %do% stri_count_regex(primers$forward_primer[i], regexRepeat, opts_regex = list())
+          repeatCheckFP_2 <- which(repeatCheckFP == 0)
+          repeatCheckRP <- foreach(i=1:nrow(primers)) %do% stri_count_regex(primers$reverse_primer[i], regexRepeat, opts_regex = list())
+          repeatCheckRP_2 <- which(repeatCheckRP == 0)
+          repeatCheck <- intersect(repeatCheckFP_2, repeatCheckRP_2)
+          primers <- primers[repeatCheck,]
           
           if(dim(primers)[1] == 0){ 
-             shinyalert("Oh no!", "Sorry no primer sets met your specified constraints. Please check the following constraint: 
-                         Max non-target hybridization efficiency. You will have to increase this value to allow more inclusivity 
-                         of non-target species/OTUs.", type = "error")
-             updateNavbarPage(session, "mainPage", selected = 'panel3')
+            # Error for initial design of the primer sets
+            shinyalert("Oh no!", "It seems you have set your max repeat length setting set too low for your primers 
+                        and thus no primers could be found. You will have to increase this value.", type = "error")
+            updateNavbarPage(session, "mainPage", selected = 'panel3b')
           } else {
-            primers <- (primers[,c("setID", "identifier", "ampliconLength", "startPosFP", "endPosFP", "length_FP","start_reverse", 
-                                   "startPosRP", "endPosRP", "length_RP", "forward_primer", "reverse_primer", "FP_hybr_efficiency", 
-                                   "RP_hybr_efficiency", "gcFP", "gcRP", "forward_coverage", "reverse_coverage")])
+          
+            # Amplicon length calculation
+            primers$ampliconLength <- primers$endPosRP - primers$startPosFP + 1
             
-            primers <- data.frame(primers, stringsAsFactors = FALSE)
-            primers <- as.data.frame(lapply(primers, function(y) gsub(",", "", y)))
-            primers <- primers[complete.cases(primers), ]
-            primers[, ] <- lapply(primers[, ], as.character)
-            primers$setID <- 1:nrow(primers)
+            primers$FP_hybr_efficiency <- round(primers$forward_efficiency, 2)
+            primers$RP_hybr_efficiency <- round(primers$reverse_efficiency, 2)
             
-            # Averaging of target coverage across forward and reverse primers
-            primers$forward_coverage <- as.numeric(primers$forward_coverage)
-            primers$reverse_coverage <- as.numeric(primers$reverse_coverage)
-            primers$coverage <- (primers$forward_coverage + primers$reverse_coverage) / 2
+            # Calculating GC content
+            gcFP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$forward_primer[i]), "GC", as.prob=TRUE) 
+            gcRP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$reverse_primer[i]), "GC", as.prob=TRUE)
+                
+            # Filtering by GC Content Criteria set by the user
+            gcCheckFP <- which(gcFP > primerVar$gcPrimerMin & gcFP < primerVar$gcPrimerMax)
+            gcCheckRP <- which(gcRP > primerVar$gcPrimerMin & gcRP < primerVar$gcPrimerMax)
+            gcCheck <- intersect(gcCheckFP, gcCheckRP)
             
-            # Annealing temperature calculation
-            predictedAnnealing_FP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$forward_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
-                                                                           Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
-                                                                           Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
-            primers$Annealing_FP <- round(as.numeric(unlist(predictedAnnealing_FP)) - 3, 2)
-            
-            predictedAnnealing_RP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$reverse_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
-                                                                           Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
-                                                                           Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
-            primers$Annealing_RP <- round(as.numeric(unlist(predictedAnnealing_RP)) - 3, 2)
-            
-            primers$annealDiffprimer <- round(abs(primers$Annealing_FP - primers$Annealing_RP), 2)
-            
-            annealDiffCheck <- which(primers$annealDiffprimer > primerVar$annealDiffPrimerMax)
-            primers <- primers[-annealDiffCheck,]
-            
-            if(dim(primers)[1] == 0){ 
-              shinyalert("Oh no!", "Sorry no primer sets met your specified constraints. Please check the following constraint: 
-                          Max anneal temperature difference between FP and RP. You will have to increase this value.", type = "error")
-              updateNavbarPage(session, "mainPage", selected = 'panel3')
+            if(length(gcCheck) == 0){ 
+               shinyalert("Oh no!","Sorry no primer sets met your specified constraints. Please check the following constraint: 
+                          % gc content for primers. You will have to increase the % gc content range of your primers.", type = "error")
+               updateNavbarPage(session, "mainPage", selected = 'panel3b')
             } else {
-              annealAverage <- (as.numeric(primers$Annealing_FP) + as.numeric(primers$Annealing_RP)) / 2
-              primers$annealAverage <- annealAverage
+              # Assigning GC content to primers dataframe
+              primers <- primers[gcCheck, ]
+              gcFP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$forward_primer[i]), "GC", as.prob=TRUE)
+              gcFP <- unlist(gcFP)
+              gcRP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$reverse_primer[i]), "GC", as.prob=TRUE)
+              gcRP <- unlist(gcRP)
+              primers$gcFP <- round(gcFP, 2)
+              primers$gcRP <- round(gcRP, 2)
+    
+              # Finding non-target hybridization values and filtering according to non-target hybridization criteria set by the user
+              nonTFP <- regmatches(primers$mismatches_forward, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", primers$mismatches_forward))
+              nonTFP <- foreach(i=1:nrow(primers)) %do% as.numeric(nonTFP[[i]])
+              nonTRP <- regmatches(primers$mismatches_reverse, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", primers$mismatches_reverse))
+              nonTRP <- foreach(i=1:nrow(primers)) %do% as.numeric(nonTRP[[i]])
+              nonTargetCheck <- foreach(i=1:nrow(primers)) %do% append(nonTFP[[i]], nonTRP[[i]])
+              nonTargetCheck2 <- foreach(i=1:nrow(primers)) %do% which(nonTargetCheck[[i]] > 50)
+              nonTargetCheck <- foreach(i=1:nrow(primers)) %do% nonTargetCheck[[i]][-nonTargetCheck2[[i]]]
+              nonTargetCheck <- foreach(i=1:nrow(primers)) %do% max(nonTargetCheck[[i]])
+              primers$nonTarget <- as.numeric(nonTargetCheck)
+              nonTargetCheck <- which(primers$nonTarget > primerVar$maxNonTarget)
               
-              primerHybrAverage <- (as.numeric(primers$FP_hybr_efficiency) + as.numeric(primers$RP_hybr_efficiency)) / 2
-              primers$hybrEfficiencyAverage <- primerHybrAverage
+              if(length(nonTargetCheck) > 0){
+                 primers <- primers[-nonTargetCheck,]
+              }
               
-              # Calculating probe start and stop positions that must be met
-              probeStart <- as.numeric(primers$startPosFP) + as.numeric(primers$length_FP) + 1
-              probeEnd <- as.numeric(primers$endPosRP) - as.numeric(primers$length_RP) - 1
-              
-              incProgress(0.4, detail = "Starting design of probes...")
-              
-              # Four different tileseqs at different probe lengths within probe length range set by user
-              probesT1 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMinLength)-1, maxLength = primerVar$probeMinLength)
-              
-              probesT2 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMinLength), maxLength = (primerVar$probeMinLength)+1)
-              
-              probesT3 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMaxLength)-2, maxLength = (primerVar$probeMaxLength)-1)
-              
-              probesT4 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMaxLength)-1, maxLength = primerVar$probeMaxLength)
-              
-              dfTarget <- rbind(probesT1, probesT2, probesT3, probesT4)
-              
-              # Find probes within target amplification region
-              probeFind <- foreach(i=1:length(probeStart)) %do%  which(dfTarget$start_aligned > probeStart[i] & dfTarget$end_aligned < probeEnd[i])
-              listProbeFind <- foreach(i=1:length(probeFind)) %do% dfTarget[probeFind[[i]],]
-              
-              if(length(listProbeFind[[1]]) == 0){ 
-                shinyalert("Oh no!", "Sorry no probes were found from within your target amplification region. You will have to increase either your target 
-                            amplification region or your amplicon length range. Also look at reducing the length range of your probe if your amplicon
-                            length range is small.", type = "error")
-                updateNavbarPage(session, "mainPage", selected = 'panel1')
+              if(dim(primers)[1] == 0){ 
+                 shinyalert("Oh no!", "Sorry no primer sets met your specified constraints. Please check the following constraint: 
+                             Max non-target hybridization efficiency. You will have to increase this value to allow more inclusivity 
+                             of non-target species/OTUs.", type = "error")
+                 updateNavbarPage(session, "mainPage", selected = 'panel3')
               } else {
-                names(listProbeFind) <- 1:nrow(primers)
-                probes <- do.call("rbind", listProbeFind)
-                probes$setID <- round(as.numeric(rownames(probes)), 1)
-                probes$setID <- round(probes$setID, 0)
-                probes$length_probe <- nchar(probes$target_site)
+                primers <- (primers[,c("setID", "identifier", "ampliconLength", "startPosFP", "endPosFP", "length_FP","start_reverse", 
+                                       "startPosRP", "endPosRP", "length_RP", "forward_primer", "reverse_primer", "FP_hybr_efficiency", 
+                                       "RP_hybr_efficiency", "gcFP", "gcRP", "forward_coverage", "reverse_coverage")])
                 
-                # Match to target species using group coverage - must be highly similar
-                groupCoverage <- which(probes$groupCoverage >= primerVar$minCoverage)
-                probes <- probes[groupCoverage,]
+                primers <- data.frame(primers, stringsAsFactors = FALSE)
+                primers <- as.data.frame(lapply(primers, function(y) gsub(",", "", y)))
+                primers <- primers[complete.cases(primers), ]
+                primers[, ] <- lapply(primers[, ], as.character)
+                primers$setID <- 1:nrow(primers)
                 
-                if(dim(probes)[1] == 0){ 
-                  shinyalert("Oh no!", "Sorry no probes were found with such a high target coverage. You will have to lower the value for this setting.",
-                             type = "error")
+                # Averaging of target coverage across forward and reverse primers
+                primers$forward_coverage <- as.numeric(primers$forward_coverage)
+                primers$reverse_coverage <- as.numeric(primers$reverse_coverage)
+                primers$coverage <- (primers$forward_coverage + primers$reverse_coverage) / 2
+                
+                # Annealing temperature calculation
+                predictedAnnealing_FP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$forward_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
+                                                                               Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
+                                                                               Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
+                primers$Annealing_FP <- round(as.numeric(unlist(predictedAnnealing_FP)) - 3, 2)
+                
+                predictedAnnealing_RP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$reverse_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
+                                                                               Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
+                                                                               Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
+                primers$Annealing_RP <- round(as.numeric(unlist(predictedAnnealing_RP)) - 3, 2)
+                
+                primers$annealDiffprimer <- round(abs(primers$Annealing_FP - primers$Annealing_RP), 2)
+                
+                annealDiffCheck <- which(primers$annealDiffprimer > primerVar$annealDiffPrimerMax)
+                primers <- primers[-annealDiffCheck,]
+                
+                if(dim(primers)[1] == 0){ 
+                  shinyalert("Oh no!", "Sorry no primer sets met your specified constraints. Please check the following constraint: 
+                              Max anneal temperature difference between FP and RP. You will have to increase this value.", type = "error")
                   updateNavbarPage(session, "mainPage", selected = 'panel3')
                 } else {
-                  # GC Check for the probe
-                  gcProbe <- foreach(i=1:nrow(probes)) %do% letterFrequency(DNAString(probes$target_site[i]), "GC", as.prob=TRUE) 
-                  gcProbe <- unlist(gcProbe)
-                  probes$gcProbe <- round(gcProbe, 2) 
-                  probes$probe_seq <- probes$target_site  
+                  annealAverage <- (as.numeric(primers$Annealing_FP) + as.numeric(primers$Annealing_RP)) / 2
+                  primers$annealAverage <- annealAverage
                   
-                  gcCheck <- which(probes$gcProbe >= primerVar$gcProbeMin & probes$gcProbe <= primerVar$gcProbeMax)
-                  probes <- probes[gcCheck,]
+                  primerHybrAverage <- (as.numeric(primers$FP_hybr_efficiency) + as.numeric(primers$RP_hybr_efficiency)) / 2
+                  primers$hybrEfficiencyAverage <- primerHybrAverage
                   
-                  if(dim(probes)[1] == 0){ 
-                    shinyalert("Oh no!", "Sorry no probes were found in the gc % range that was set. You will have to increase the range of 
-                                acceptable % gc content for the probes.", type = "error")
-                    updateNavbarPage(session, "mainPage", selected = 'panel3b')
+                  # Calculating probe start and stop positions that must be met
+                  probeStart <- as.numeric(primers$startPosFP) + as.numeric(primers$length_FP) + 1
+                  probeEnd <- as.numeric(primers$endPosRP) - as.numeric(primers$length_RP) - 1
+                  
+                  incProgress(0.4, detail = "Starting design of probes...")
+                  
+                  # Four different tileseqs at different probe lengths within probe length range set by user
+                  probesT1 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMinLength)-1, maxLength = primerVar$probeMinLength)
+                  
+                  probesT2 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMinLength), maxLength = (primerVar$probeMinLength)+1)
+                  
+                  probesT3 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMaxLength)-2, maxLength = (primerVar$probeMaxLength)-1)
+                  
+                  probesT4 <- TileSeqs(dbConn, identifier = reactTarget$target, minLength = (primerVar$probeMaxLength)-1, maxLength = primerVar$probeMaxLength)
+                  
+                  dfTarget <- rbind(probesT1, probesT2, probesT3, probesT4)
+                  
+                  # Find probes within target amplification region
+                  probeFind <- foreach(i=1:length(probeStart)) %do%  which(dfTarget$start_aligned > probeStart[i] & dfTarget$end_aligned < probeEnd[i])
+                  listProbeFind <- foreach(i=1:length(probeFind)) %do% dfTarget[probeFind[[i]],]
+                  
+                  if(length(listProbeFind[[1]]) == 0){ 
+                    shinyalert("Oh no!", "Sorry no probes were found from within your target amplification region. You will have to increase either your target 
+                                amplification region or your amplicon length range. Also look at reducing the length of your probe if your amplicon
+                                length range is small.", type = "error")
+                    updateNavbarPage(session, "mainPage", selected = 'panel1')
                   } else {
-                    # Annealing Check for the probe
-                    annealProbe <- foreach(i=1:nrow(probes)) %do% Tm_GC(probes$probe_seq[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
-                                                                        Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
-                                                                        Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
-                    annealProbe <- unlist(annealProbe)
-                    probes$annealProbe <- round(annealProbe, 2)
+                    names(listProbeFind) <- 1:nrow(primers)
+                    probes <- do.call("rbind", listProbeFind)
+                    probes$setID <- round(as.numeric(rownames(probes)), 1)
+                    probes$setID <- round(probes$setID, 0)
+                    probes$length_probe <- nchar(probes$target_site)
                     
-                    probes <- (probes[,c("setID", "length_probe", "start_aligned", "end_aligned", "groupCoverage", "annealProbe", "gcProbe", "probe_seq")])
+                    # Match to target species using group coverage - must be highly similar
+                    groupCoverage <- which(probes$groupCoverage >= primerVar$minCoverage)
+                    probes <- probes[groupCoverage,]
                     
-                    probeList <- lapply(unique(probes$setID), function(x) 
-                      probes[probes$setID == x,])
-                    
-                    annealCheck <- foreach(i=1:length(probeList)) %do% which(probeList[[i]]$annealProbe >= (annealAverage[i] + primerVar$annealTempProbe))
-                    
-                    if(length(annealCheck[[1]]) == 0){ 
-                      shinyalert("Oh no!", "Sorry no probes were found with such a high annealing temperature. You will have to lower the 
-                                  min annealing temperature of the probe.", type = "error")
+                    if(dim(probes)[1] == 0){ 
+                      shinyalert("Oh no!", "Sorry no probes were found with such a high target coverage. You will have to lower the value for this setting.",
+                                 type = "error")
                       updateNavbarPage(session, "mainPage", selected = 'panel3')
                     } else {
-                      probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][annealCheck[[i]],]
-                      probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][order(probeList[[i]]$groupCoverage),]
-                      probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][1,]
+                      # Run detection in primer sets (ex: AAA is a run length of 3 in a primer)
+                      regexRun2 <- paste("(A{",primerVar$runLP,"}|G{", primerVar$runLP, "}|C{", primerVar$runLP, "}|T{", primerVar$runLP, "})", sep="")
+                      runCheckProbe <- foreach(i=1:nrow(probes)) %do% stri_count_regex(probes$target_site[i], regexRun2, opts_regex = list())
+                      runCheckProbe2 <- which(runCheckProbe == 0)
+                      probes <- probes[runCheckProbe2,]
                       
-                      probes <- do.call("rbind", probeList)
-                      probes <- probes[1:nrow(primers),]
-                      probes$setID <- 1:nrow(primers)
+                      if(dim(probes)[1] == 0){ 
+                        shinyalert("Oh no!", "Sorry no probes were found with the run length that was set. You will have to increase the run length of your probes.", type = "error")
+                        updateNavbarPage(session, "mainPage", selected = 'panel3b')
+                      } else {
                       
-                      # Merging primer sets to probes and modifying/organizing probe columns
-                      primerprobes <- merge(primers, probes, by.x="setID", by.y="setID")
-                      primerprobes$setID <- 1:nrow(primerprobes)
-                      primerprobes$annealDiffProbe <- round(primerprobes$annealProbe - primerprobes$annealAverage, 2)
-                      primerprobes$startPosFP <- as.numeric(primerprobes$startPosFP)
-                      primerprobes$endPosFP <- as.numeric(primerprobes$endPosFP)
-                      primerprobes$startPosProbe <- as.numeric(primerprobes$start_aligned)
-                      primerprobes$endPosProbe <- as.numeric(primerprobes$end_aligned)
-                      primerprobes$startPosRP <- as.numeric(primerprobes$startPosRP)
-                      primerprobes$endPosRP <- as.numeric(primerprobes$endPosRP)
-                      primerprobes$coverage <- as.numeric(primerprobes$coverage)
-                      primerprobes$groupCoverage <- as.numeric(primerprobes$groupCoverage)
-                      primerprobes$targetCoverage <- round((primerprobes$coverage + primerprobes$groupCoverage) / 2, 4)
-                      primerprobes <- primerprobes[order(primerprobes$targetCoverage, decreasing = TRUE),]
-                      primerprobes <- primerprobes[1:5,]
-                      primerprobes$setID <- 1:nrow(primerprobes)
-                      
-                      primerVar$setID <- primerprobes$setID
-                      updateSelectInput(session, "inSelectPrimer", choices = primerVar$setID)
-                      
-                      dfPrimers$primerBindTab <- primerprobes
-                      
-                      primerprobes <- (primerprobes[,c("setID","identifier","targetCoverage", "ampliconLength", "forward_primer","reverse_primer", "probe_seq", 
-                                                       "length_FP", "length_RP", "length_probe", "gcFP", "gcRP", "gcProbe", "FP_hybr_efficiency", 
-                                                       "RP_hybr_efficiency", "hybrEfficiencyAverage", "annealAverage", "annealDiffprimer", 
-                                                       "annealProbe", "annealDiffProbe", "startPosFP", "endPosFP", "startPosProbe", "endPosProbe",
-                                                       "startPosRP", "endPosRP")])
-                      primerprobes[, ] <- lapply(primerprobes[, ], as.character)
-                      dfPrimers$primerTab <- primerprobes
-                      
-                      dfPrimers$primerGraphTab <- dfPrimers$primerTab
+                        # Repeat detection in primer sets (ex: CGCG would be a repeat length of 2 in a primer)
+                        regexRepeat2 <- paste("(AA{",primerVar$repeatLP, "}|AT{", primerVar$repeatLP, "}|AG{", primerVar$repeatLP, "}|AC{", primerVar$repeatLP,
+                                             "}|CA{",primerVar$repeatLP, "}|CT{", primerVar$repeatLP, "}|CG{", primerVar$repeatLP, "}|CC{", primerVar$repeatLP, 
+                                             "}|GA{",primerVar$repeatLP, "}|GT{", primerVar$repeatLP, "}|GG{", primerVar$repeatLP, "}|GC{", primerVar$repeatLP, 
+                                             "}|TA{",primerVar$repeatLP, "}|TT{", primerVar$repeatLP, "}|TG{", primerVar$repeatLP, "}|TC{", primerVar$repeatLP, "})", sep="")
+                        repeatCheckProbe <- foreach(i=1:nrow(probes)) %do% stri_count_regex(probes$target_site[i], regexRepeat2, opts_regex = list())
+                        repeatCheckProbe2 <- which(repeatCheckProbe == 0)
+                        probes <- probes[repeatCheckProbe2,]
+                        
+                        if(dim(probes)[1] == 0){ 
+                          shinyalert("Oh no!", "Sorry no probes were found with the repeat length that was set. You will have to increase the repeat length of your probes.", type = "error")
+                          updateNavbarPage(session, "mainPage", selected = 'panel3b')
+                        } else {
+                        
+                          # GC Check for the probe
+                          gcProbe <- foreach(i=1:nrow(probes)) %do% letterFrequency(DNAString(probes$target_site[i]), "GC", as.prob=TRUE) 
+                          gcProbe <- unlist(gcProbe)
+                          probes$gcProbe <- round(gcProbe, 2) 
+                          probes$probe_seq <- probes$target_site  
                           
-                      dfPrimers$primerGraphTab$annealAveragePrimer <- dfPrimers$primerGraphTab$annealAverage
+                          gcCheck <- which(probes$gcProbe >= primerVar$gcProbeMin & probes$gcProbe <= primerVar$gcProbeMax)
+                          probes <- probes[gcCheck,]
                           
-                      dfPrimers$primerGraphTab <- (dfPrimers$primerGraphTab[,c("setID","targetCoverage", "ampliconLength", "gcFP", "gcRP", "gcProbe", 
-                                                                               "FP_hybr_efficiency", "RP_hybr_efficiency", "hybrEfficiencyAverage", 
-                                                                               "annealAveragePrimer", "annealDiffprimer", "annealProbe", "annealDiffProbe")])
-                      
-                      dfPrimers$primerGraphTab[, ] <- lapply(dfPrimers$primerGraphTab[, ], as.numeric)
-                      
-                      updateSelectInput(session, "inSelectPrimer2", choices = colnames(dfPrimers$primerGraphTab[,2:13]), selected = "targetCoverage")
-                      
-                      incProgress(0.3, detail = "Finished design of primer and probe sets!")
-                      
-                      Sys.sleep(0.5)
-                      
-                      # Primer Table using RHandsontable functionality 
-                      output$primerTable <- renderRHandsontable({
-                        rhandsontable(dfPrimers$primerTab) %>% hot_cols(columnSorting = TRUE, readOnly = FALSE, manualColumnResize = TRUE)
-                      })
+                          if(dim(probes)[1] == 0){ 
+                            shinyalert("Oh no!", "Sorry no probes were found in the gc % range that was set. You will have to increase the range of acceptable % gc content for the probes.", type = "error")
+                            updateNavbarPage(session, "mainPage", selected = 'panel3b')
+                          } else {
+                            # Annealing Check for the probe
+                            annealProbe <- foreach(i=1:nrow(probes)) %do% Tm_GC(probes$probe_seq[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
+                                                                                Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
+                                                                                Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
+                            annealProbe <- unlist(annealProbe)
+                            probes$annealProbe <- round(annealProbe, 2)
+                            
+                            probes <- (probes[,c("setID", "length_probe", "start_aligned", "end_aligned", "groupCoverage", "annealProbe", "gcProbe", "probe_seq")])
+                            
+                            probeList <- lapply(unique(probes$setID), function(x) 
+                              probes[probes$setID == x,])
+                            
+                            annealCheck <- foreach(i=1:length(probeList)) %do% which(probeList[[i]]$annealProbe >= (annealAverage[i] + primerVar$annealTempProbe))
+                            
+                            if(length(annealCheck[[1]]) == 0){ 
+                              shinyalert("Oh no!", "Sorry no probes were found with such a high annealing temperature. You will have to lower the min annealing temperature of the probe.", type = "error")
+                              updateNavbarPage(session, "mainPage", selected = 'panel3')
+                            } else {
+                              probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][annealCheck[[i]],]
+                              probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][order(probeList[[i]]$groupCoverage),]
+                              probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][1,]
+                              
+                              probes <- do.call("rbind", probeList)
+                              probes <- probes[1:nrow(primers),]
+                              probes$setID <- 1:nrow(primers)
+                              
+                              # Merging primer sets to probes and modifying/organizing probe columns
+                              primerprobes <- merge(primers, probes, by.x="setID", by.y="setID")
+                              primerprobes$setID <- 1:nrow(primerprobes)
+                              primerprobes$annealDiffProbe <- round(primerprobes$annealProbe - primerprobes$annealAverage, 2)
+                              primerprobes$startPosFP <- as.numeric(primerprobes$startPosFP)
+                              primerprobes$endPosFP <- as.numeric(primerprobes$endPosFP)
+                              primerprobes$startPosProbe <- as.numeric(primerprobes$start_aligned)
+                              primerprobes$endPosProbe <- as.numeric(primerprobes$end_aligned)
+                              primerprobes$startPosRP <- as.numeric(primerprobes$startPosRP)
+                              primerprobes$endPosRP <- as.numeric(primerprobes$endPosRP)
+                              primerprobes$coverage <- as.numeric(primerprobes$coverage)
+                              primerprobes$groupCoverage <- as.numeric(primerprobes$groupCoverage)
+                              primerprobes$targetCoverage <- round((primerprobes$coverage + primerprobes$groupCoverage) / 2, 4)
+                              primerprobes <- primerprobes[order(primerprobes$targetCoverage, decreasing = TRUE),]
+                              primerprobes <- primerprobes[1:5,]
+                              primerprobes$setID <- 1:nrow(primerprobes)
+                              
+                              primerVar$setID <- primerprobes$setID
+                              updateSelectInput(session, "inSelectPrimer", choices = primerVar$setID)
+                              
+                              dfPrimers$primerBindTab <- primerprobes
+                              
+                              primerprobes <- (primerprobes[,c("setID","identifier","targetCoverage", "ampliconLength", "forward_primer","reverse_primer", "probe_seq", 
+                                                               "length_FP", "length_RP", "length_probe", "gcFP", "gcRP", "gcProbe", "FP_hybr_efficiency", 
+                                                               "RP_hybr_efficiency", "hybrEfficiencyAverage", "annealAverage", "annealDiffprimer", 
+                                                               "annealProbe", "annealDiffProbe", "startPosFP", "endPosFP", "startPosProbe", "endPosProbe",
+                                                               "startPosRP", "endPosRP")])
+                              primerprobes[, ] <- lapply(primerprobes[, ], as.character)
+                              dfPrimers$primerTab <- primerprobes
+                              
+                              dfPrimers$primerGraphTab <- dfPrimers$primerTab
+                                  
+                              dfPrimers$primerGraphTab$annealAveragePrimer <- dfPrimers$primerGraphTab$annealAverage
+                                  
+                              dfPrimers$primerGraphTab <- (dfPrimers$primerGraphTab[,c("setID","targetCoverage", "ampliconLength", "gcFP", "gcRP", "gcProbe", 
+                                                                                       "FP_hybr_efficiency", "RP_hybr_efficiency", "hybrEfficiencyAverage", 
+                                                                                       "annealAveragePrimer", "annealDiffprimer", "annealProbe", "annealDiffProbe")])
+                              
+                              dfPrimers$primerGraphTab[, ] <- lapply(dfPrimers$primerGraphTab[, ], as.numeric)
+                              
+                              updateSelectInput(session, "inSelectPrimer2", choices = colnames(dfPrimers$primerGraphTab[,2:13]), selected = "targetCoverage")
+                              
+                              incProgress(0.3, detail = "Finished design of primer and probe sets!")
+                              
+                              Sys.sleep(0.5)
+                              
+                              # Primer Table using RHandsontable functionality 
+                              output$primerTable <- renderRHandsontable({
+                                rhandsontable(dfPrimers$primerTab) %>% hot_cols(columnSorting = TRUE, readOnly = FALSE, manualColumnResize = TRUE)
+                              })
+                            }
+                          }
+                        }
+                      }
                     }
                   }
                 }
