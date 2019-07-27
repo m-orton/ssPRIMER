@@ -1,7 +1,7 @@
 # Please ensure R version: 3.6.0 is installed prior to running this tool
 
 # Change max file upload to 20 Mb
-options(shiny.maxRequestSize = 20*1024^2)
+options(shiny.maxRequestSize = 100*1024^2)
 options(warn=-1)
 
 # install.packages("plyr")
@@ -34,6 +34,8 @@ library(foreach)
 library(TmCalculator)
 # install.packages("stringi")
 library(stringi)
+# install.packages("d3heatmap")
+library(d3heatmap)
 
 # Read in of an example alignment for testing
 exampleAlignment <- readDNAStringSet("sampleAlignment.fas")
@@ -44,7 +46,7 @@ ui <- tagList(useShinyalert(),
                 tags$style(
                   HTML(".shiny-notification {
                        height: 100px;
-                       width: 800px;
+                       width: 600px;
                        position:fixed;
                        top: calc(50% - 50px);;
                        left: calc(50% - 400px);;
@@ -53,8 +55,25 @@ ui <- tagList(useShinyalert(),
                   )
                 )
               ),
+              tags$head(
+                HTML("<script>
+                    var socket_timeout_interval
+                    var n = 0
+                    $(document).on('shiny:connected', function(event) {
+                    socket_timeout_interval = setInterval(function(){
+                    Shiny.onInputChange('count', n++)
+                    }, 15000)
+                    });
+                    $(document).on('shiny:disconnected', function(event) {
+                    clearInterval(socket_timeout_interval)
+                    });
+                    </script>"
+                )
+                
+              ),
               navbarPage("ssPRIMER - A Web-Based Tool for Species-Specific Primer Design", id = "mainPage",
                          tabPanel("1. Upload Alignment", id='panel1', value="panel1",
+                                  textOutput("keepAlive"),
                                   sidebarLayout(
                                     sidebarPanel(
                                       p("Welcome to the ssPRIMER homepage! ssPRIMER is a GUI based tool that provides a straightforward 
@@ -244,24 +263,24 @@ ui <- tagList(useShinyalert(),
                                                                        with the specified primer set each PCR cycle. Ideally this should 
                                                                        be set as low as possible however setting it lower will limit the 
                                                                        number of potential primer sets that can be generated)",
-                                                                       min = 0, max = 50, value = 10, post = "%"),
+                                                                       min = 0, max = 70, value = 10, post = "%"),
                                                                
                                                           # Primer set Tm
-                                                          sliderInput("inSlider15", "Optimal Primer Set Annealing Temperature (the tool will try and find a primer set
+                                                          sliderInput("inSlider15", "Optimal Primer Set Annealing Temperature (C) (the tool will try and find a primer set
                                                                       that matches as closely as possible to this temperature)",
-                                                                      min = 40, max = 70, value = 60, step = 0.1, post = "C"),
+                                                                      min = 40, max = 70, value = 60, step = 0.1),
                                                          
-                                                         sliderInput("inSlider17", "Primer Set Annealing Temperature Range (generated primer sets
-                                                                      must fall within this range of annealing temperatures)",
-                                                                     min = 40, max = 70, value = c(55, 65), step = 0.1, post = "C"),
+                                                          sliderInput("inSlider17", "Primer Set Annealing Temperature Range (C) (generated primer sets
+                                                                       must fall within this range of annealing temperatures)",
+                                                                       min = 40, max = 70, value = c(55, 65), step = 0.1),
                                                                
-                                                          sliderInput("inSlider29", "Max Annealing Temperature Difference between FP and RP
-                                                                      (ideally should be within 0-3 degrees difference)",
-                                                                      min = 0, max = 6, value = 3, step = 0.1, post = "C"),
+                                                          sliderInput("inSlider29", "Max Annealing Temperature Difference (C) between FP and RP
+                                                                       (ideally should be within 0-3 degrees difference)",
+                                                                       min = 0, max = 10, value = 3, step = 0.1),
                                                                
-                                                          sliderInput("inSlider26", "Min Increase in Probe Annealing Temperature 
-                                                                      (ideally should be 7-10 degrees higher than primer set)",
-                                                                      min = 1, max = 20, value = 7, step = 0.1, post = "C"),
+                                                          sliderInput("inSlider26", "Min Increase in Probe Annealing Temperature (C)
+                                                                       (ideally should be 7-10 degrees higher than primer set)",
+                                                                       min = 1, max = 20, value = 7, step = 0.1),
                                                          
                                                           tags$hr(),
 
@@ -280,54 +299,54 @@ ui <- tagList(useShinyalert(),
                                                       
                                                       tabPanel("Secondary Constraints", id='panel3b', value="panel3b",
                                                                
-                                                               tags$hr(),
+                                                          tags$hr(),
                                                                
-                                                               sliderInput("inSlider16", "Primer Length Range",
-                                                                           min = 18, max = 30, value = c(18, 23), step = 1, post = "bp"),
+                                                          sliderInput("inSlider16", "Primer Length Range",
+                                                                      min = 18, max = 30, value = c(18, 23), step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider30", "Probe Length Range",
-                                                                           min = 20, max = 40, value = c(24, 28), step = 1, post = "bp"),
+                                                          sliderInput("inSlider30", "Probe Length Range",
+                                                                      min = 20, max = 40, value = c(24, 28), step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider27", "Primer GC Percentage Range",
-                                                                           min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
+                                                          sliderInput("inSlider27", "Primer GC Percentage Range",
+                                                                      min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
                                                                
-                                                               sliderInput("inSlider28", "Probe GC Percentage Range",
-                                                                           min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
+                                                          sliderInput("inSlider28", "Probe GC Percentage Range",
+                                                                      min = 30, max = 80, value = c(30, 70), step = 0.1, post = "%"), 
                                                                
-                                                               sliderTextInput("inSlider23", "Primer-Dimer Hybridization Efficiency 
-                                                                               (less likely to form dimers < 1e-07 > more likely to form dimers. 
-                                                                               Ideally you want this set as low as possible however setting it 
-                                                                               lower will also limit the number of potential primer sets.)",
-                                                                               choices = c("1e-10", "1e-09", "1e-08", "1e-07", "1e-06", "1e-05", "1e-04"), 
-                                                                               selected = c("1e-07")),
+                                                          sliderTextInput("inSlider23", "Primer-Dimer Hybridization Efficiency 
+                                                                          (less likely to form dimers < 1e-07 > more likely to form dimers. 
+                                                                           Ideally you want this set as low as possible however setting it 
+                                                                           lower will also limit the number of potential primer sets.)",
+                                                                           choices = c("1e-10", "1e-09", "1e-08", "1e-07", "1e-06", "1e-05", "1e-04"), 
+                                                                           selected = c("1e-07")),
                                                                
-                                                               p("Long stretches of runs or repeats are generally unfavorable for your primers due to 
-                                                                  mispriming. Run and repeat settings are set higher by default to allow for a greater 
-                                                                  number of potential primer and probe sets but can be set lower if needed."),
+                                                          p("Long stretches of runs or repeats are generally unfavorable for your primers due to 
+                                                            mispriming. Run and repeat settings are set higher by default to allow for a greater 
+                                                            number of potential primer and probe sets but can be set lower if needed."),
                                                                
-                                                               sliderInput("inSlider20", "Max Run Length for Primers 
-                                                                           (ex: AAA would be a run length of 3)",
-                                                                           min = 0, max = 10, value = 4, step = 1, post = "bp"),
+                                                          sliderInput("inSlider20", "Max Run Length for Primers 
+                                                                      (ex: AAA would be a run length of 3)",
+                                                                       min = 0, max = 10, value = 4, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider21", "Max Repeat Length for Primers
-                                                                           (ex: CGCG would be a repeat length of 2)",
-                                                                           min = 0, max = 6, value = 3, step = 1, post = "bp"),
+                                                          sliderInput("inSlider21", "Max Repeat Length for Primers
+                                                                      (ex: CGCG would be a repeat length of 2)",
+                                                                       min = 0, max = 6, value = 3, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider22", "Max Run Length for Probes 
-                                                                           (ex: AAA would be a run length of 3)",
-                                                                           min = 0, max = 10, value = 5, step = 1, post = "bp"),
+                                                          sliderInput("inSlider22", "Max Run Length for Probes 
+                                                                      (ex: AAA would be a run length of 3)",
+                                                                       min = 0, max = 10, value = 5, step = 1, post = "bp"),
                                                                
-                                                               sliderInput("inSlider24", "Max Repeat Length for Probes
-                                                                           (ex: CGCG would be a repeat length of 2)",
-                                                                           min = 0, max = 6, value = 4, step = 1, post = "bp"),
+                                                          sliderInput("inSlider24", "Max Repeat Length for Probes
+                                                                      (ex: CGCG would be a repeat length of 2)",
+                                                                      min = 0, max = 6, value = 4, step = 1, post = "bp"),
                                                                
-                                                               tags$hr(),
+                                                          tags$hr(),
                                                                
-                                                               actionButton('back3', "Back", icon("angle-double-left"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                                          actionButton('back3', "Back", icon("angle-double-left"), 
+                                                                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
                                                                
-                                                               actionButton('reset2b', "Reset to Default", icon("undo"), 
-                                                                            style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                                          actionButton('reset2b', "Reset to Default", icon("undo"), 
+                                                                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
                                                                
                                                       ))), width = 5),
                                     mainPanel(div(),
@@ -364,7 +383,8 @@ ui <- tagList(useShinyalert(),
                                                            p("Not sure what a parameter means? Go to the help menu:"),
                                                           
                                                            actionButton('help', "Help Menu", icon("angle-double-right"), 
-                                                                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4")),
+                                                                       style="color: #fff; background-color: #337ab7; border-color: #2e6da4")
+                                                           ),
                                                           
                                                   tabPanel("Primer Binding Visualization",  id='panelPrimerBind', value="panelPrimerBind",
                                                   
@@ -388,12 +408,12 @@ ui <- tagList(useShinyalert(),
           
                                                            htmlOutput("inc2")),
                                                   
-                                                  tabPanel("Primer Set Comparison",  id='panelPrimerGraphs', value="panelPrimerGraphs",
+                                                  tabPanel("Primer Set Comparison (Bar Plot)",  id='panelPrimerGraphs', value="panelPrimerGraphs",
                                                            
                                                            tags$hr(), 
                                                            
-                                                           p("Here you can visualize in bar graph form the differences between each primer and probe
-                                                             set based on many different parameters selectable from the dropdown menu shown below."),
+                                                           p("Here you can visualize in a bar plot the differences between each primer and probe
+                                                              set based on many different parameters selectable from the dropdown menu shown below."),
                                                            
                                                            tags$hr(), 
                                                   
@@ -402,8 +422,52 @@ ui <- tagList(useShinyalert(),
                                                            
                                                            tags$hr(),
                                                            
-                                                           plotOutput('plot')
-                                                  )
+                                                           plotOutput('plot')),
+                                                  
+                                                  tabPanel("Primer Set Comparison (Heat Map)",  id='panelPrimerGraphs', value="panelPrimerGraphs",
+                                                           
+                                                           tags$hr(), 
+                                                           
+                                                           p("Here you can visualize in a heat map the differences between each primer and probe
+                                                              set based on their individual parameters. Max and min parameters set during the 
+                                                              primer design process are also presented for comparison"),
+                                                           
+                                                           tags$hr(),
+                                                           
+                                                           actionButton('heatmap', "Generate Heat Map", icon("angle-double-right"), 
+                                                                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+                                                           
+                                                           tags$hr(),
+                                                           
+                                                           d3heatmapOutput("heatmap")),
+                                                  
+                                                  tabPanel("Dimerization Check",  id='panelPrimerDimer', value="panelPrimerDimer",
+                                                           
+                                                           tags$hr(), 
+                                                           
+                                                           p("To check for possible dimerization, it is recommended that you head over to this website:"),
+                                                           a(href="http://www.primer-dimer.com/", "PrimerDimer", target="_blank"),
+                                                           
+                                                           tags$hr(), 
+                                                           
+                                                           p("You can simply copy the text output shown below for the generated primer sets, paste them into this tool using 
+                                                              the link provided above and the tool will find the most likely candidates for dimerization amongst the 
+                                                              generated primer sets. Select the multiplex analysis option. Look for dimer products less than -9 kcal/mol as these 
+                                                              are the most problematic. Cross-dimerization products between primer and probe sets can be ignored if multiple primer 
+                                                              sets are inputted at once."),
+            
+                                                           tags$hr(),
+                                                           
+                                                           htmlOutput("primertext"),
+                                                  
+                                                           tags$hr(),  
+                                                            
+                                                           p("PrimerDimer is a web-based, condition-independent primer dimerization tool and has been shown to 
+                                                              outperform other software tools in the accuracy of its dimerization predictions:"),
+                                                           p("Lu, J et al. (2017) PrimerSuite: A High-Throughput Web-Based Primer Design Program for Multiplex Bisulfite PCR. 
+                                                              Sci. Rep.7, 41328; doi: 10.1038/srep41328."))
+                                                           
+                                                           
                                     )))),
                          tabPanel("About", id='About', value="panel6",
                                   sidebarLayout(
@@ -429,13 +493,18 @@ ui <- tagList(useShinyalert(),
                                           p("You can also view the source code here:"),
                                           a(href="https://github.com/m-orton/ssPRIMER", "ssPRIMER source code", target="_blank"), 
                                           
+                                          tags$hr(), 
+                                          
+                                          p("Issues with the tool? You can also report bugs here:"),
+                                          a(href="https://github.com/m-orton/ssPRIMER/issues", "Report a bug", target="_blank"), 
+                                          
                                           tags$hr(),
                                           
                                           p("ssPRIMER is licensed under the GNU General Public License v3.0:"),
                                           a(href="https://github.com/m-orton/ssPRIMER/blob/master/LICENSE", "GPLv3.0 License for ssPRIMER", target="_blank"),
                                           
                                           tags$hr(),
-                                                                                    
+                          
                                           p("This tool relies greatly on the DECIPHER, Biostrings and TmCalculator R packages and OligoArrayAux 
                                              software for design of primer sets:"),
                                           a(href="https://bioconductor.org/packages/release/bioc/html/DECIPHER.html", "DECIPHER, ", target="_blank"),
@@ -446,23 +515,40 @@ ui <- tagList(useShinyalert(),
                                           tags$hr(),
                                           
                                           p("Citation for DECIPHER:"),
-                                          p("Wright ES (2016). “Using DECIPHER v2.0 to Analyze Big Biological Sequence Data in R.” The R Journal, 8(1), 352-359."),
+                                          p("Wright, ES (2016) Using DECIPHER v2.0 to Analyze Big Biological Sequence Data in R. The R Journal, 8(1), 352-359."),
                                           
                                           tags$hr(),
                                           
                                           p("Citation for Biostrings:"),
-                                          p("Pagès H, Aboyoun P, Gentleman R, DebRoy S (2019). Biostrings: Efficient manipulation of biological strings. 
+                                          p("Pagès H, Aboyoun P, Gentleman R, DebRoy S (2019) Biostrings: Efficient manipulation of biological strings. 
                                              R package version 2.52.0."),
                                           
                                           tags$hr(),
                                           
                                           p("Citations for OligoArrayAux:"), 
-                                          p("Markham, N. R. & Zuker, M. (2005) DINAMelt web server for nucleic acid melting prediction. 
+                                          p("Markham, NR & Zuker, M (2005) DINAMelt web server for nucleic acid melting prediction. 
                                              Nucleic Acids Res., 33, W577-W581."),
-                                          p("Markham, N. R. & Zuker, M. (2008) UNAFold: software for nucleic acid folding and hybridization. 
+                                          p("Markham, NR & Zuker, M (2008) UNAFold: software for nucleic acid folding and hybridization. 
                                              In Keith, J. M., editor, Bioinformatics, Volume II. Structure, Function and Applications, 
                                              number 453 in Methods in Molecular Biology, chapter 1, pages 3–31. Humana Press, 
-                                             Totowa, NJ. ISBN 978-1-60327-428-9.") 
+                                             Totowa, NJ. ISBN 978-1-60327-428-9."), 
+                                          
+                                          tags$hr(),
+                                          
+                                          p("Citation for PrimerDimer:"), 
+                                          p("Lu, J et al. (2017) PrimerSuite: A High-Throughput Web-Based Primer Design Program for Multiplex Bisulfite PCR. 
+                                             Sci. Rep.7, 41328; doi: 10.1038/srep41328."),
+                                          
+                                          tags$hr(),
+                                          
+                                          p("Links for other packages used:"), 
+                                          a(href="https://cran.r-project.org/web/packages/shiny/index.html", "shiny, ", target="_blank"),
+                                          a(href="https://github.com/rstudio/d3heatmap", "d3HeatMap, ", target="_blank"),
+                                          a(href="https://github.com/jrowen/rhandsontable", "rhandsontable, ", target="_blank"),
+                                          a(href="https://github.com/daattali/shinyjs", "shinyjs, ", target="_blank"),
+                                          a(href="https://github.com/daattali/shinyalert", "shinyalert, ", target="_blank"),
+                                          a(href="https://github.com/dreamRs/shinyWidgets", "shinyWidgets, ", target="_blank"),
+                                          a(href="https://cran.r-project.org/web/packages/foreach/index.html", "foreach, ", target="_blank")
 
                                       ), width = 5),
                                     mainPanel(div(),
@@ -627,8 +713,8 @@ server <- function(input, output, session){
     } else {
       alignment <- subseq(reactUpload$alignment, reactSlider1$sliderInput2, reactSlider1$sliderInput3)
       BrowseSeqs(alignment, htmlFile = paste(tempdir(), "/myAlignment.html", sep = ""), openURL = FALSE,
-                 patterns=c("A", "C", "G", "T", "-"), 
-                 colors=c("#999999", "#E69F00", "#56B4E9", "#009E73","#0072B2"), colWidth=reactSlider1$sliderInput4)
+                 patterns=c("-", "A", "C", "G", "T"), 
+                 colors=c("#999999", "#E69F00", "#56B4E9", "#009E73", "#0072B2"), colWidth=reactSlider1$sliderInput4)
     }
   })
   
@@ -877,8 +963,6 @@ server <- function(input, output, session){
     
     withProgress(message = "Starting Design Process...", value = 0, {
       
-      Sys.sleep(0.5)
-      
       dbConn <- dbConnect(SQLite(), ":memory:")
       Seqs2DB(reactUpload$alignment, "XStringSet", dbConn, "userAlignment")
       desc <- dbGetQuery(dbConn, "select description from Seqs")
@@ -886,11 +970,11 @@ server <- function(input, output, session){
                             function(x) return(x[length(x)])))
       Add2DB(data.frame(identifier=desc), dbConn)
       
+      incProgress(0.1, detail = "Organizing sequences into tiles...")
+      
       tiles <- TileSeqs(dbConn)
       
-      incProgress(0.3, detail = "Starting design of primers...")
-      
-      Sys.sleep(0.5)
+      incProgress(0.1, detail = "Starting design of primers...")
       
       # Generate Initial Primer and Probe Sets that will then be filtered by GC content further down
       primers <- try(DesignPrimers(tiles, identifier=reactTarget$target, start=primerVar$startPos, end=primerVar$endPos,
@@ -912,11 +996,13 @@ server <- function(input, output, session){
         
       } else {
         
+        incProgress(0.2, detail = "Filtering primer sets based on settings...")
+        
         primers$setID <- row.names(primers)
         primers$length_FP <- nchar(primers$forward_primer)
         primers$length_RP <- nchar(primers$reverse_primer)
         
-        # Subsetting alignment by target amplification region and using that alignment for calculation of primers
+        # Subsetting alignment by target amplification region and using that alignment for calculation of primer positions
         dna <- SearchDB(dbConn)
         alignment <- subseq(dna, reactSlider1$sliderInput2, reactSlider1$sliderInput3)
         names(alignment) <- desc
@@ -1020,8 +1106,8 @@ server <- function(input, output, session){
               gcFP <- unlist(gcFP)
               gcRP <- foreach(i=1:nrow(primers)) %do% letterFrequency(DNAString(primers$reverse_primer[i]), "GC", as.prob=TRUE)
               gcRP <- unlist(gcRP)
-              primers$gcFP <- round(gcFP, 2)
-              primers$gcRP <- round(gcRP, 2)
+              primers$gcFP <- round(gcFP, 3)
+              primers$gcRP <- round(gcRP, 3)
     
               # Finding non-target hybridization values and filtering according to non-target hybridization criteria set by the user
               nonTFP <- regmatches(primers$mismatches_forward, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", primers$mismatches_forward))
@@ -1065,14 +1151,14 @@ server <- function(input, output, session){
                 
                 # Tm using R package TmCalculator and annealing temperature calculation
                 predictedTm_FP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$forward_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
-                                                                               Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
-                                                                               Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
+                                                                        Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
+                                                                        Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
                 
                 primers$Annealing_FP <- round(as.numeric(unlist(predictedTm_FP)) - 3, 2)
                 
                 predictedTm_RP <- foreach(i=1:nrow(primers)) %do% Tm_GC(primers$reverse_primer[i], ambiguous = FALSE, userset = NULL, variant = "Primer3Plus",
-                                                                               Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
-                                                                               Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
+                                                                        Na = primerVar$monovalentNa, K = primerVar$monovalentNa, Tris = 0, 
+                                                                        Mg = primerVar$divalentMg, dNTPs = primerVar$dNTP, saltcorr = 0, mismatch = TRUE)
                 
                 primers$Annealing_RP <- round(as.numeric(unlist(predictedTm_RP)) - 3, 2)
                 
@@ -1111,7 +1197,7 @@ server <- function(input, output, session){
                     probeStart <- as.numeric(primers$endPosFP) 
                     probeEnd <- as.numeric(primers$startPosRP) 
                     
-                    incProgress(0.4, detail = "Starting design of probes...")
+                    incProgress(0.2, detail = "Starting design of probes...")
                     
                     # Generates tileseqs between a range of probe lengths set by user
                     probeTiles <- foreach(i=1:(primerVar$probeMaxLength-primerVar$probeMinLength)) %do% TileSeqs(dbConn, identifier = reactTarget$target, minLength = primerVar$probeMinLength,  maxLength = (primerVar$probeMinLength + i))
@@ -1130,6 +1216,8 @@ server <- function(input, output, session){
                       updateNavbarPage(session, "mainPage", selected = 'panel1')
                       
                     } else {
+                      
+                      incProgress(0.2, detail = "Filtering probes based on settings...")
                       
                       names(listProbeFind) <- 1:nrow(primers)
                       probes <- do.call("rbind", listProbeFind)
@@ -1177,7 +1265,7 @@ server <- function(input, output, session){
                             # GC Check for the probe
                             gcProbe <- foreach(i=1:nrow(probes)) %do% letterFrequency(DNAString(probes$target_site[i]), "GC", as.prob=TRUE) 
                             gcProbe <- unlist(gcProbe)
-                            probes$gcProbe <- round(gcProbe, 2) 
+                            probes$gcProbe <- round(gcProbe, 3) 
                             probes$probe_seq <- probes$target_site  
                             
                             gcCheck <- which(probes$gcProbe >= primerVar$gcProbeMin & probes$gcProbe <= primerVar$gcProbeMax)
@@ -1201,7 +1289,7 @@ server <- function(input, output, session){
                               probeList <- lapply(unique(probes$setID), function(x) 
                                 probes[probes$setID == x,])
                               
-                              annealCheck <- foreach(i=1:length(probeList)) %do% which(probeList[[i]]$annealProbe >= (annealAverage[i] + primerVar$annealTempProbe))
+                              annealCheck <- foreach(i=1:length(probeList)) %do% which(probeList[[i]]$annealProbe < (primers$annealAverage[i] + primerVar$annealTempProbe))
                               
                               if(length(annealCheck[[1]]) == 0){ 
                                 shinyalert("Oh no!", "Sorry no probes were found with such a high annealing temperature. You will have to lower the min annealing temperature of the probe.", type = "error")
@@ -1209,8 +1297,8 @@ server <- function(input, output, session){
                                 
                               } else {
                                 
-                                # Subsetting to select probes with appropriate annealing temperature and ordering by target coverage
-                                probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][annealCheck[[i]],]
+                                # Subsetting to select probes by ordering by target coverage
+                                probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][-annealCheck[[i]],]
                                 probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][order(probeList[[i]]$groupCoverage, decreasing = TRUE),]
                                 probeList <- foreach(i=1:length(probeList)) %do% probeList[[i]][1,]
                                 
@@ -1236,73 +1324,99 @@ server <- function(input, output, session){
                                 primerprobes$startPosProbe <- matchPatternProbe_Start
                                 primerprobes$endPosProbe <- matchPatternProbe_End
                                 
-                                # Check to make sure probes dont overlap with primers
-                                probePosCheck1 <- which(primerprobes$endPosProbe < primerprobes$startPosRP)
-                                primerprobes <- primerprobes[probePosCheck1,]
-                                probePosCheck2 <- which(primerprobes$startPosProbe > primerprobes$endPosFP)
-                                primerprobes <- primerprobes[probePosCheck2,]
+                                # Double check to make sure probe annealing is above the min and subset these out of the results
+                                annealProbeCheck2 <- which(primerprobes$annealDiffProbe > primerVar$annealTempProbe)
+                                primerprobes <- primerprobes[annealProbeCheck2,]
                                 
                                 if(dim(primerprobes)[1] == 0){ 
-                                  
-                                  shinyalert("Oh no!", "Sorry no probes were found from within your target amplification region. You will have to increase either your target 
-                                  amplification region or your amplicon length range. Also look at reducing the lengths of your probe if your amplicon
-                                  length range is small.", type = "error")
-                                  updateNavbarPage(session, "mainPage", selected = 'panel1')
+                                  shinyalert("Oh no!", "Sorry no probes were found with such a high annealing temperature. You will have to lower the min annealing temperature of the probe.", type = "error")
+                                  updateNavbarPage(session, "mainPage", selected = 'panel3')
                                   
                                 } else {
                                 
-                                  # Target coverage calculation
-                                  primerprobes$coverage <- as.numeric(primerprobes$coverage)
-                                  primerprobes$groupCoverage <- as.numeric(primerprobes$groupCoverage)
-                                  primerprobes$targetCoverage <- round((primerprobes$coverage + primerprobes$groupCoverage) / 2, 4)
-                                  primerprobes <- primerprobes[order(primerprobes$targetCoverage, decreasing = TRUE),]
-    
-                                  # Selecting the top five matches (ordered by target coverage)
-                                  primerprobes <- primerprobes[1:5,]
-                                  primerprobes$setID <- 1:nrow(primerprobes)
-                                  primerVar$setID <- primerprobes$setID
-                                  updateSelectInput(session, "inSelectPrimer", choices = primerVar$setID)
+                                  # Check to make sure probes dont overlap with primers
+                                  probePosCheck1 <- which(primerprobes$endPosProbe < primerprobes$startPosRP)
+                                  primerprobes <- primerprobes[probePosCheck1,]
+                                  probePosCheck2 <- which(primerprobes$startPosProbe > primerprobes$endPosFP)
+                                  primerprobes <- primerprobes[probePosCheck2,]
                                   
-                                  dfPrimers$primerBindTab <- primerprobes
+                                  if(dim(primerprobes)[1] == 0){ 
+                                    
+                                    shinyalert("Oh no!", "Sorry no probes were found from within your target amplification region. You will have to increase either your target amplification region or your amplicon length range. 
+                                    Also look at reducing the lengths of your probe if your amplicon length range is small.", type = "error")
+                                    updateNavbarPage(session, "mainPage", selected = 'panel1')
+                                    
+                                  } else {
+                                    
+                                    incProgress(0.2, detail = "Preparing primer and probe sets...")
                                   
-                                  primerprobes <- (primerprobes[,c("setID","identifier","targetCoverage", "ampliconLength", "forward_primer","reverse_primer", "probe_seq", 
-                                                                   "length_FP", "length_RP", "length_probe", "gcFP", "gcRP", "gcProbe", "FP_hybr_efficiency", 
-                                                                   "RP_hybr_efficiency", "hybrEfficiencyAverage", "annealAverage", "annealDiffprimer", 
-                                                                   "annealProbe", "annealDiffProbe", "startPosFP", "endPosFP", "startPosProbe", "endPosProbe",
-                                                                   "startPosRP", "endPosRP", "ampliconSeq")])
-                                  
-                                  # Converting from decimal to percentage so its more clear to the user
-                                  primerprobes[,3] <- primerprobes[,3] * 100
-                                  primerprobes[,11:16] <- lapply(primerprobes[,11:16], as.numeric)
-                                  primerprobes[,11:16] <- primerprobes[,11:16] * 100
-                                  
-                                  # Then converting to character again so can be easily imported to rhanstontable
-                                  primerprobes[, ] <- lapply(primerprobes[, ], as.character)
-                                  dfPrimers$primerTab <- primerprobes
-                                  
-                                  dfPrimers$primerGraphTab <- dfPrimers$primerTab
-                                      
-                                  dfPrimers$primerGraphTab$annealAveragePrimer <- dfPrimers$primerGraphTab$annealAverage
-                                      
-                                  dfPrimers$primerGraphTab <- (dfPrimers$primerGraphTab[,c("setID","targetCoverage", "ampliconLength", "gcFP", "gcRP", "gcProbe", 
-                                                                                           "FP_hybr_efficiency", "RP_hybr_efficiency", "hybrEfficiencyAverage", 
-                                                                                           "annealAveragePrimer", "annealDiffprimer", "annealProbe", "annealDiffProbe")])
-                                  
-                                  dfPrimers$primerGraphTab[, ] <- lapply(dfPrimers$primerGraphTab[, ], as.numeric)
-                                  
-                                  updateSelectInput(session, "inSelectPrimer2", choices = colnames(dfPrimers$primerGraphTab[,2:13]), selected = "targetCoverage")
-                                  
-                                  incProgress(0.3, detail = "Finished design of primer and probe sets!")
-                                  
-                                  Sys.sleep(0.5)
-                                  
-                                  # Primer Table using RHandsontable functionality 
-                                  output$primerTable <- renderRHandsontable({
-                                    rhandsontable(dfPrimers$primerTab) %>% hot_cols(columnSorting = TRUE, readOnly = FALSE, manualColumnResize = TRUE)
-                                  })
-                                  
-                                  # Switch to last panel with primer and probe table
-                                  updateNavbarPage(session, "mainPage", selected = 'panel5')
+                                    # Target coverage calculation
+                                    primerprobes$coverage <- as.numeric(primerprobes$coverage)
+                                    primerprobes$groupCoverage <- as.numeric(primerprobes$groupCoverage)
+                                    primerprobes$targetCoverage <- round((primerprobes$coverage + primerprobes$groupCoverage) / 2, 4)
+                                    primerprobes <- primerprobes[order(primerprobes$targetCoverage, decreasing = TRUE),]
+      
+                                    # Selecting the top five matches (ordered by target coverage)
+                                    primerprobes <- primerprobes[1:5,]
+                                    primerprobes$setID <- 1:nrow(primerprobes)
+                                    primerVar$setID <- primerprobes$setID
+                                    updateSelectInput(session, "inSelectPrimer", choices = primerVar$setID)
+                                    
+                                    dfPrimers$primerBindTab <- primerprobes
+                                    
+                                    primerprobes <- (primerprobes[,c("setID","identifier","targetCoverage", "ampliconLength", "forward_primer","reverse_primer", "probe_seq", 
+                                                                     "length_FP", "length_RP", "length_probe", "gcFP", "gcRP", "gcProbe", "FP_hybr_efficiency", 
+                                                                     "RP_hybr_efficiency", "hybrEfficiencyAverage", "annealAverage", "annealDiffprimer", 
+                                                                     "annealProbe", "annealDiffProbe", "startPosFP", "endPosFP", "startPosProbe", "endPosProbe",
+                                                                     "startPosRP", "endPosRP", "ampliconSeq")])
+                                    
+                                    # Converting from decimal to percentage so its more clear to the user
+                                    primerprobes[,3] <- primerprobes[,3] * 100
+                                    primerprobes[,11:16] <- lapply(primerprobes[,11:16], as.numeric)
+                                    primerprobes[,11:16] <- primerprobes[,11:16] * 100
+                                    
+                                    # Then converting to character again so can be easily imported to rhanstontable
+                                    primerprobes[, ] <- lapply(primerprobes[, ], as.character)
+                                    dfPrimers$primerTab <- primerprobes
+                                    
+                                    dfPrimers$primerGraphTab <- dfPrimers$primerTab
+                                        
+                                    dfPrimers$primerGraphTab$annealAveragePrimer <- dfPrimers$primerGraphTab$annealAverage
+                                        
+                                    dfPrimers$primerGraphTab <- (dfPrimers$primerGraphTab[,c("setID","targetCoverage", "ampliconLength", "gcFP", "gcRP", "gcProbe", 
+                                                                                             "FP_hybr_efficiency", "RP_hybr_efficiency", "hybrEfficiencyAverage", 
+                                                                                             "annealAveragePrimer", "annealDiffprimer", "annealProbe", "annealDiffProbe")])
+                                    
+                                    dfPrimers$primerGraphTab[, ] <- lapply(dfPrimers$primerGraphTab[, ], as.numeric)
+                                    
+                                    updateSelectInput(session, "inSelectPrimer2", choices = colnames(dfPrimers$primerGraphTab[,2:13]), selected = "targetCoverage")
+                                    
+                                    incProgress(0.2, detail = "Finished design of primer and probe sets!")
+                                    
+                                    Sys.sleep(0.5)
+                                    
+                                    # Primer Table using RHandsontable functionality 
+                                    output$primerTable <- renderRHandsontable({
+                                      rhandsontable(dfPrimers$primerTab) %>% hot_cols(columnSorting = TRUE, readOnly = FALSE, manualColumnResize = TRUE)
+                                    })
+                                    
+                                    # Render text for dimerization
+                                    p1 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(">", dfPrimers$primerTab$setID[i], "_FP", sep="")
+                                    p2 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(dfPrimers$primerTab$forward_primer[i]) 
+                                    p3 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(">", dfPrimers$primerTab$setID[i], "_RP", sep="")
+                                    p4 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(dfPrimers$primerTab$reverse_primer[i])
+                                    p5 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(">", dfPrimers$primerTab$setID[i], "_Probe", sep="")
+                                    p6 <- foreach(i=1:nrow(dfPrimers$primerTab)) %do% paste(dfPrimers$primerTab$probe_seq[i])
+                                    p7 <- rep(paste(""), nrow(dfPrimers$primerTab))
+                                    p8 <- rep(paste(""), nrow(dfPrimers$primerTab))
+                                                                  
+                                    output$primertext = renderUI({                              
+                                      HTML(paste(p1, p2, p3, p4, p5, p6, p7, p8, sep='<br/>'))                          
+                                    })
+                                    
+                                    # Switch to last panel with primer and probe table
+                                    updateNavbarPage(session, "mainPage", selected = 'panel5')
+                                  }
                                 }
                               }
                             }
@@ -1320,6 +1434,13 @@ server <- function(input, output, session){
       
     })
     
+  })
+  
+  
+  # Prevent timeouts 
+  output$keepAlive <- renderText({
+    req(input$count)
+    paste("keep alive ", input$count)
   })
   
   # Primer binding visualization code
@@ -1352,7 +1473,7 @@ server <- function(input, output, session){
     # Code for generating the alignment visualization
     BrowseSeqs(alignment, htmlFile = paste(tempdir(), "/myAlignment2.html", sep = ""), openURL = FALSE, colorPatterns=c(dfPrimers$primerBindTab2$startPosFP, 
                dfPrimers$primerBindTab2$endPosFP, dfPrimers$primerBindTab2$startPosProbe, dfPrimers$primerBindTab2$endPosProbe, 
-               dfPrimers$primerBindTab2$startPosRP, dfPrimers$primerBindTab2$endPosRP), highlight=1, colors=c("#999999", "#E69F00", "#56B4E9", "#009E73","0072B2"))
+               dfPrimers$primerBindTab2$startPosRP, dfPrimers$primerBindTab2$endPosRP), highlight=1, colors=c("0072B2", "#E69F00", "#56B4E9", "#009E73", "#999999"))
     
     getPage2 <-function() {
       return(includeHTML( file ( paste(tempdir(), "/myAlignment2.html", sep = "") )))
@@ -1371,8 +1492,38 @@ server <- function(input, output, session){
     output$plot <- renderPlot({
       ggplot(dfPrimers$primerGraphTab, aes_string(x="setID", y=input$inSelectPrimer2, fill="setID")) + geom_bar(stat="identity", width=0.30) +
         theme(axis.title=element_text(size=15), axis.text.x=element_text(face="bold", size=12), axis.text.y=element_text(face="bold", size=12), 
-              legend.title = element_blank()) + 
-        scale_fill_manual(values = c("#999999", "#E69F00", "#56B4E9", "#009E73","#0072B2")) 
+              legend.position = "none", legend.title = element_blank()) + 
+        scale_fill_manual(values = c("#0072B2", "#E69F00", "#56B4E9", "#009E73", "#999999"))
+    })
+  })
+  
+  # Primer and probe heat map visualization code
+  observeEvent(input$heatmap, {
+    
+    dfHeatMap <- dfPrimers$primerGraphTab
+
+    # Adding max and min parameters set during the design process for comparison on the heatmap
+    dfHeatMap[nrow(dfHeatMap) + 1,] = list(setID="Max Parameter", targetCoverage="100", ampliconLength=primerVar$maxProductSize, gcFP=primerVar$gcPrimerMax * 100, 
+                                           gcRP=primerVar$gcPrimerMax * 100, gcProbe=primerVar$gcProbeMax * 100, FP_hybr_efficiency="100", RP_hybr_efficiency="100", 
+                                           hybrEfficiencyAverage="100", annealAveragePrimer=primerVar$annealRangeMax, 
+                                           annealDiffprimer=primerVar$annealDiffPrimerMax, annealProbe="80", annealDiffProbe="20")
+    
+    dfHeatMap[nrow(dfHeatMap) + 1,] = list(setID="Min Parameter", targetCoverage="20", ampliconLength=primerVar$minProductSize, gcFP=primerVar$gcPrimerMin * 100, 
+                                           gcRP=primerVar$gcPrimerMin * 100, gcProbe=primerVar$gcProbeMin * 100, FP_hybr_efficiency="20", RP_hybr_efficiency="20", 
+                                           hybrEfficiencyAverage="20", annealAveragePrimer=primerVar$annealRangeMin, annealDiffprimer="0",
+                                           annealProbe="40", annealDiffProbe=primerVar$annealTempProbe)
+    dfHeatMap <- rbind(dfHeatMap[6,], dfHeatMap[1:5,], dfHeatMap[7,])
+    
+    dfHeatMap2 <- dfHeatMap[,2:13]
+
+    m <- as.matrix(sapply(dfHeatMap2, as.numeric))  
+    colnames(m) <- colnames(dfHeatMap2)
+    rownames(m) <- dfHeatMap$setID
+    
+    # Code for plotting heatmap according to primer and probe variables using d3heatmap
+    output$heatmap <- renderD3heatmap({
+      d3heatmap(m, colors = c("#d0d1e6", "#a6bddb", "#74a9cf", "#3690c0", "#0570b0", "#045a8d", "#023858"), scale = "column", dendrogram = "none", 
+                xaxis_font_size = 15, yaxis_font_size = 15, xaxis_height = 150)
     })
   })
 
