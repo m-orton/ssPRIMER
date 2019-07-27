@@ -48,7 +48,7 @@ library(stringi)
 # install.packages("d3heatmap")
 library(d3heatmap)
 ```
-to run locally, please ensure OligoArrayLux is installed first:
+To run locally, please ensure OligoArrayLux is installed first:
 
 [OligoArrayLux](http://unafold.rna.albany.edu/?q=DINAMelt/OligoArrayAux)
 
