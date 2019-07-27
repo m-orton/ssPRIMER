@@ -48,26 +48,23 @@ library(stringi)
 # install.packages("d3heatmap")
 library(d3heatmap)
 ```
+to run locally, please ensure OligoArrayLux is installed first:
 
-To run simply use the command in RStudio:
+[OligoArrayLux](http://unafold.rna.albany.edu/?q=DINAMelt/OligoArrayAux)
+
+If using the test alignment ensure this file is in your working directory:
+
+[Sample Alignment](sampleAlignment.fas)
+
+Then simply use this command in RStudio (ensuring that you have R version 3.6.0 installed):
 ```
 shiny::runGitHub('ssPRIMER', 'm-orton')
 ```
 
-Alternatively you can run by ensuring the app.R script and following files are in your current working
-R directory in RStudio:
-
-[Sample Alignment](sampleAlignment.fas)
-
-[Hybrid-min](hybrid-min.exe)
-
-[Hybrid-ss-min](hybrid-ss-min.exe)
-
-
 ## Authors of Shiny App
 Matthew Orton
 
-Contributions by Dr. Sally Adamowicz, Kamil Chatila-Amos, Samantha Majoros and Alexandra Albin
+Contributions by Dr. Sally Adamowicz, Kamil Chatila-Amos, Samantha Majoros and Alexandra Albin.
 
 This tool relies greatly on the DECIPHER, Biostrings and TmCalculator R packages for the design of primer sets:
 
